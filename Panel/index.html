@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EvaraTap - Water Flow Control System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .dashboard {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 0;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            border: none;
+        }
+        
+        .card-header {
+            background-color: #0275d8;
+            color: white;
+            font-weight: bold;
+            border-radius: 15px 15px 0 0;
+            padding: 15px 20px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .connected {
+            background-color: #28a745;
+        }
+        
+        .disconnected {
+            background-color: #dc3545;
+        }
+        
+        .device-status {
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .flow-gauge {
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .gauge-wrapper {
+            position: relative;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        .gauge-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            margin: 0 auto;
+        }
+        
+        .gauge-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .gauge-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .gauge-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .gauge-unit {
+            font-size: 1.2rem;
+            color: #6c757d;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .stat-item {
+            padding: 10px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            color: #7f8c8d;
+        }
+        
+        .valve-control {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .btn-lg {
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 8px;
+        }
+        
+        .history-item {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-text {
+            margin-left: 10px;
+        }
+        
+        #lastUpdated {
+            color: #6c757d;
+            font-style: italic;
+            font-size: 14px;
+            text-align: right;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <h1 class="mb-4">EvaraTap - Water Flow Control System</h1>
+        
+        <div class="row">
+            <!-- System Status Card -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">System Status</div>
+                    <div class="card-body">
+                        <div class="device-status">
+                            <span>ESP32 Device:</span>
+                            <span id="deviceStatus" class="status-text">
+                                <span class="status-indicator disconnected"></span>
+                                Disconnected
+                            </span>
+                        </div>
+                        
+                        <div class="device-status">
+                            <span>Dashboard:</span>
+                            <span id="dashboardStatus" class="status-text">
+                                <span class="status-indicator disconnected"></span>
+                                Disconnected (Last HB: Never)
+                            </span>
+                        </div>
+                        
+                        <div class="device-status">
+                            <span>Valve Status:</span>
+                            <span id="valveStatus" class="status-text">Unknown</span>
+                        </div>
+                        
+                        <div id="lastUpdated">Last updated: Never</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Flow Rate Card -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Volume & Flow Rate</div>
+                    <div class="card-body">
+                        <div class="gauge-wrapper">
+                            <div class="gauge-container">
+                                <canvas id="volumeGauge" class="gauge-canvas"></canvas>
+                                <div class="gauge-text">
+                                    <div class="gauge-value" id="volumeValue">0.0</div>
+                                    <div class="gauge-label">Liters</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stats">
+                            <div class="stat-item">
+                                <div class="stat-value" id="flowValue">0.00</div>
+                                <div class="stat-label">Flow Rate (L/min)</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="limitValue">10.0</div>
+                                <div class="stat-label">Limit (L)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Valve Control Card -->
+        <div class="card">
+            <div class="card-header">Valve Control</div>
+            <div class="card-body">
+                <div class="valve-control">
+                    <button id="valveOnBtn" class="btn btn-success btn-lg me-3">OPEN VALVE</button>
+                    <button id="valveOffBtn" class="btn btn-danger btn-lg me-3">CLOSE VALVE</button>
+                    <button id="resetBtn" class="btn btn-info btn-lg">RESET COUNTER</button>
+                </div>
+                
+                <div class="settings-panel mt-4">
+                    <h4>Volume Limit Settings</h4>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="volumeLimit">Volume Limit (Liters)</label>
+                                <input type="number" class="form-control" id="volumeLimit" min="1" step="0.5" value="10.0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" id="autoShutoff" checked>
+                                <label class="form-check-label" for="autoShutoff">Enable Auto Shutoff</label>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary mt-3 w-100" onclick="saveSettings()">Save Settings</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Flow History Card -->
+        <div class="card">
+            <div class="card-header">System Events</div>
+            <div class="card-body">
+                <div id="eventHistory" class="history-list">
+                    <div class="history-item">No events recorded yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let lastHeartbeatTime = null;
+        let systemConnected = false;
+        let valveState = "UNKNOWN";
+        let totalVolume = 0;
+        let volumeLimit = 10.0;
+        let autoShutoffEnabled = true;
+        let volumeChart = null;
+        
+        // DOM Elements
+        const deviceStatusEl = document.getElementById("deviceStatus");
+        const dashboardStatusEl = document.getElementById("dashboardStatus");
+        const valveStatusEl = document.getElementById("valveStatus");
+        const flowValueEl = document.getElementById("flowValue");
+        const volumeValueEl = document.getElementById("volumeValue");
+        const limitValueEl = document.getElementById("limitValue");
+        const lastUpdatedEl = document.getElementById("lastUpdated");
+        const eventHistoryEl = document.getElementById("eventHistory");
+        const valveOnBtn = document.getElementById("valveOnBtn");
+        const valveOffBtn = document.getElementById("valveOffBtn");
+        const resetBtn = document.getElementById("resetBtn");
+        const volumeLimitInput = document.getElementById("volumeLimit");
+        const autoShutoffCheckbox = document.getElementById("autoShutoff");
+        
+        // Initialize the dashboard
+        document.addEventListener("DOMContentLoaded", () => {
+            // Initialize volume gauge
+            createVolumeGauge();
+            
+            // Initialize system status
+            updateSystemStatus();
+            
+            // Set up event listeners
+            valveOnBtn.addEventListener("click", () => controlValve("ON"));
+            valveOffBtn.addEventListener("click", () => controlValve("OFF"));
+            resetBtn.addEventListener("click", resetSystem);
+            
+            // Start periodic updates
+            setInterval(sendHeartbeat, 10000); // Send heartbeat every 10 seconds
+            setInterval(updateSystemStatus, 5000); // Update status every 5 seconds
+            
+            // Set initial values for settings
+            volumeLimitInput.value = volumeLimit;
+            autoShutoffCheckbox.checked = autoShutoffEnabled;
+            
+            // Initial heartbeat and status update
+            sendHeartbeat();
+            logEvent("Dashboard initialized");
+        });
+        
+        /**
+         * Send heartbeat to ESP32 via API
+         */
+        async function sendHeartbeat() {
+            try {
+                const response = await fetch("/api/heartbeat", {
+                    method: "POST"
+                });
+                
+                if (response.ok) {
+                    lastHeartbeatTime = new Date();
+                    updateDashboardStatus();
+                } else {
+                    console.error("Failed to send heartbeat");
+                }
+            } catch (error) {
+                console.error("Error sending heartbeat:", error);
+                updateDashboardStatus(false);
+            }
+        }
+        
+        /**
+         * Get system status from API
+         */
+        async function updateSystemStatus() {
+            try {
+                const response = await fetch("/api/status");
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Update UI with system status
+                        updateDeviceStatus(data.status.systemStatus === "ONLINE");
+                        updateValveStatus(data.status.valveStatus);
+                        updateFlowRate(data.status.flowRate);
+                        updateLastUpdated();
+                    } else {
+                        updateDeviceStatus(false);
+                        console.error("API error:", data.error);
+                    }
+                } else {
+                    updateDeviceStatus(false);
+                    console.error("Failed to get system status");
+                }
+            } catch (error) {
+                updateDeviceStatus(false);
+                console.error("Error fetching system status:", error);
+            }
+        }
+        
+        /**
+         * Control valve state via API
+         * @param {string} state - "ON" or "OFF"
+         */
+        async function controlValve(state) {
+            try {
+                // Disable buttons during operation
+                setValveButtonsEnabled(false);
+                
+                const response = await fetch("/api/valve", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ state })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        logEvent(`Valve command sent: ${state}`);
+                        // Update status after a short delay to allow ESP32 to process
+                        setTimeout(updateSystemStatus, 1000);
+                    } else {
+                        logEvent(`Failed to control valve: ${data.error}`, "error");
+                    }
+                } else {
+                    logEvent("Failed to send valve command", "error");
+                }
+                
+                // Re-enable buttons
+                setValveButtonsEnabled(true);
+            } catch (error) {
+                console.error("Error controlling valve:", error);
+                logEvent("Error controlling valve", "error");
+                setValveButtonsEnabled(true);
+            }
+        }
+        
+        /**
+         * Enable or disable valve control buttons
+         * @param {boolean} enabled - Whether buttons should be enabled
+         */
+        function setValveButtonsEnabled(enabled) {
+            valveOnBtn.disabled = !enabled;
+            valveOffBtn.disabled = !enabled;
+        }
+        
+        /**
+         * Update device status indicator
+         * @param {boolean} connected - Whether device is connected
+         */
+        function updateDeviceStatus(connected) {
+            systemConnected = connected;
+            
+            if (connected) {
+                deviceStatusEl.innerHTML = "<span class=\"status-indicator connected\"></span> Connected";
+            } else {
+                deviceStatusEl.innerHTML = "<span class=\"status-indicator disconnected\"></span> Disconnected";
+            }
+        }
+        
+        /**
+         * Update dashboard status indicator
+         */
+        function updateDashboardStatus() {
+            if (lastHeartbeatTime) {
+                const timeSince = Math.round((new Date() - lastHeartbeatTime) / 1000);
+                dashboardStatusEl.innerHTML = 
+                    `<span class="status-indicator connected"></span> Connected (Last HB: ${timeSince}s ago)`;
+            } else {
+                dashboardStatusEl.innerHTML = 
+                    "<span class=\"status-indicator disconnected\"></span> Disconnected (Last HB: Never)";
+            }
+        }
+        
+        /**
+         * Update valve status indicator
+         * @param {string} status - Valve status (ON/OFF)
+         */
+        function updateValveStatus(status) {
+            if (status) {
+                valveState = status.toUpperCase();
+                
+                if (valveState === "ON") {
+                    valveStatusEl.innerHTML = "<span class=\"text-success\">OPEN</span>";
+                } else if (valveState === "OFF") {
+                    valveStatusEl.innerHTML = "<span class=\"text-danger\">CLOSED</span>";
+                } else {
+                    valveStatusEl.textContent = "UNKNOWN";
+                }
+            } else {
+                valveStatusEl.textContent = "UNKNOWN";
+            }
+        }
+        
+        /**
+         * Update flow rate display
+         * @param {number} flowRate - Flow rate in liters per minute
+         */
+        function updateFlowRate(flowRate) {
+            if (flowRate !== null && !isNaN(flowRate)) {
+                flowValueEl.textContent = flowRate.toFixed(2);
+                
+                // Get volume from status as well (when available)
+                fetch("/api/status")
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update total volume
+                            updateVolumeDisplay(parseFloat(data.status.totalVolume) || 0);
+                        }
+                    })
+                    .catch(error => console.error("Error fetching volume data:", error));
+            } else {
+                flowValueEl.textContent = "0.00";
+            }
+        }
+        
+        /**
+         * Update volume display and gauge
+         * @param {number} volume - Total volume in liters
+         */
+        function updateVolumeDisplay(volume) {
+            totalVolume = volume;
+            volumeValueEl.textContent = totalVolume.toFixed(1);
+            updateVolumeGauge();
+        }
+        
+        /**
+         * Update last updated timestamp
+         */
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            lastUpdatedEl.textContent = `Last updated: ${timeString}`;
+        }
+        
+        /**
+         * Create volume gauge with Chart.js
+         */
+        function createVolumeGauge() {
+            const canvas = document.getElementById('volumeGauge');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            volumeChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [0, volumeLimit],
+                        backgroundColor: ['#3498db', '#ecf0f1'],
+                        borderWidth: 0,
+                        borderRadius: 5,
+                        circumference: 180,
+                        rotation: -90
+                    }]
+                },
+                options: {
+                    cutout: '70%',
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 500
+                    }
+                }
+            });
+            
+            // Set initial values
+            limitValueEl.textContent = volumeLimit.toFixed(1);
+        }
+        
+        /**
+         * Update the volume gauge with current values
+         */
+        function updateVolumeGauge() {
+            if (!volumeChart) return;
+            
+            // Update gauge data
+            volumeChart.data.datasets[0].data = [
+                totalVolume,
+                Math.max(0, volumeLimit - totalVolume)
+            ];
+            volumeChart.update();
+        }
+        
+        /**
+         * Reset the system
+         */
+        function resetSystem() {
+            fetch("/api/valve", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ state: "RESET" })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    logEvent("System reset - volume counter zeroed");
+                    totalVolume = 0;
+                    updateVolumeDisplay(0);
+                    setTimeout(updateSystemStatus, 1000);
+                } else {
+                    logEvent("Failed to reset system: " + data.error, "error");
+                }
+            })
+            .catch(error => {
+                console.error("Error resetting system:", error);
+                logEvent("Error resetting system", "error");
+            });
+        }
+        
+        /**
+         * Save settings
+         */
+        function saveSettings() {
+            const newLimit = parseFloat(volumeLimitInput.value);
+            const newAutoShutoff = autoShutoffCheckbox.checked;
+            
+            if (isNaN(newLimit) || newLimit <= 0) {
+                logEvent("Invalid volume limit", "error");
+                return;
+            }
+            
+            // Update local values
+            volumeLimit = newLimit;
+            autoShutoffEnabled = newAutoShutoff;
+            limitValueEl.textContent = volumeLimit.toFixed(1);
+            updateVolumeGauge();
+            
+            // Send limit setting to ESP32
+            fetch("/api/valve", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ state: `LIMIT:${newLimit}` })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    logEvent(`Volume limit set to ${newLimit}L`);
+                } else {
+                    logEvent("Failed to set volume limit: " + data.error, "error");
+                }
+            })
+            .catch(error => {
+                console.error("Error setting volume limit:", error);
+                logEvent("Error setting volume limit", "error");
+            });
+            
+            // Send auto shutoff setting to ESP32
+            fetch("/api/valve", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ state: autoShutoffEnabled ? "AUTO:ON" : "AUTO:OFF" })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    logEvent(`Auto shutoff ${autoShutoffEnabled ? "enabled" : "disabled"}`);
+                } else {
+                    logEvent("Failed to set auto shutoff: " + data.error, "error");
+                }
+            })
+            .catch(error => {
+                console.error("Error setting auto shutoff:", error);
+                logEvent("Error setting auto shutoff", "error");
+            });
+        }
+        
+        /**
+         * Log event to the event history
+         * @param {string} message - Event message
+         * @param {string} type - Event type (info, error)
+         */
+        function logEvent(message, type = "info") {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            
+            const eventClass = type === "error" ? "text-danger" : "";
+            
+            const eventEl = document.createElement("div");
+            eventEl.className = `history-item ${eventClass}`;
+            eventEl.innerHTML = `<strong>${timeString}</strong>: ${message}`;
+            
+            // Add event to the top of the list
+            if (eventHistoryEl.firstChild && eventHistoryEl.firstChild.textContent === "No events recorded yet.") {
+                eventHistoryEl.innerHTML = "";
+            }
+            
+            eventHistoryEl.insertBefore(eventEl, eventHistoryEl.firstChild);
+            
+            // Limit number of events shown
+            const maxEvents = 10;
+            while (eventHistoryEl.children.length > maxEvents) {
+                eventHistoryEl.removeChild(eventHistoryEl.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>

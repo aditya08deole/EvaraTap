@@ -1,0 +1,9 @@
+{
+  "name": "evaratap-dashboard",
+  "version": "1.0.0",
+  "description": "Remote Water Flow Control System Dashboard",
+  "private": true,
+  "dependencies": {
+    "mqtt": "5.3.5"
+  }
+}
