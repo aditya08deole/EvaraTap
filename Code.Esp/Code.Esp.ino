@@ -53,6 +53,8 @@ bool emergencyShutoff = false;
 unsigned long lastReadTime = 0;
 unsigned long lastDataSend = 0;
 unsigned long lastHeartbeat = 0;
+unsigned long valveOpenStartTime = 0;
+unsigned long lastFlowSensorActivity = 0;
 bool dashboardConnected = false;
 
 String systemMode = "AUTO"; // AUTO or MANUAL
@@ -89,6 +91,7 @@ void loadSettings() {
 // -------------------- CORE FUNCTIONS --------------------
 void IRAM_ATTR flowSensorISR() {
   pulseCount++;
+  lastFlowSensorActivity = millis();
 }
 
 void closeValve() {
@@ -97,21 +100,30 @@ void closeValve() {
     delay(PULSE_TIME);
     digitalWrite(RELAY_CLOSE_PIN, HIGH);
     valveOpen = false;
+    valveOpenStartTime = 0;
     Serial.println("✓ Valve CLOSED - Water stopped");
   }
 }
 
 void openValve() {
-  if (!valveOpen && !limitReached && !emergencyShutoff) {
+  // Check for sensor lockout (no flow sensor activity for 30 seconds)
+  bool sensorLockout = (millis() - lastFlowSensorActivity > 30000) && (millis() > 30000);
+  
+  if (!valveOpen && !limitReached && !emergencyShutoff && !sensorLockout) {
     digitalWrite(RELAY_OPEN_PIN, LOW);
     delay(PULSE_TIME);
     digitalWrite(RELAY_OPEN_PIN, HIGH);
     valveOpen = true;
+    valveOpenStartTime = millis();
     volumeAtValveOpen = totalVolumeLiters;
     volumeSinceValveOpen = 0.0;
     Serial.println("✓ Valve OPENED - Water flowing");
   } else {
-    Serial.println("⚠ Cannot open valve - System locked or already open");
+    Serial.println("⚠ Cannot open valve:");
+    if (valveOpen) Serial.println("  - Already open");
+    if (limitReached) Serial.println("  - Volume limit reached");
+    if (emergencyShutoff) Serial.println("  - Emergency shutdown active");
+    if (sensorLockout) Serial.println("  - Flow sensor lockout active");
   }
 }
 
@@ -167,15 +179,25 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 void sendSensorData() {
   if (!mqtt.connected()) return;
   DynamicJsonDocument doc(512);
+  
+  // System Status
   doc["device_heartbeat"] = true;
   doc["valve_state"] = valveOpen ? "ON" : "OFF";
   doc["system_mode"] = systemMode;
   doc["dashboard_connected"] = dashboardConnected;
   doc["emergency_shutoff"] = emergencyShutoff;
+  
+  // Safety Features
+  bool sensorLockout = (millis() - lastFlowSensorActivity > 30000) && (millis() > 30000);
+  doc["sensor_lockout"] = sensorLockout;
+  doc["manual_override"] = (systemMode == "MANUAL");
+  doc["current_open_time_s"] = valveOpen ? (millis() - valveOpenStartTime) / 1000 : 0;
+  
+  // Flow & Volume Data
   doc["flow_rate_lpm"] = currentFlowRateLPS * 60.0;
-  doc["total_volume_l"] = totalVolumeLiters;
+  doc["total_volume_liters"] = totalVolumeLiters;
   doc["volume_since_open"] = volumeSinceValveOpen;
-  doc["volume_limit"] = volumeLimitLiters;
+  doc["volume_limit_liters"] = volumeLimitLiters;
   doc["auto_shutoff_enabled"] = autoShutoffEnabled;
   doc["limit_reached"] = limitReached;
   
@@ -215,6 +237,7 @@ void setup() {
 
   pinMode(FLOW_SENSOR_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN), flowSensorISR, RISING);
+  lastFlowSensorActivity = millis(); // Initialize sensor activity tracking
 
   WiFi.begin(ssid, password);
   Serial.print("📶 Connecting to WiFi");

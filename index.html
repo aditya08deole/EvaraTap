@@ -428,6 +428,10 @@
                         </div>
                         <div class="stat-label">Valve Status</div>
                     </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="sessionTime">0:00</div>
+                        <div class="stat-label">Session Time</div>
+                    </div>
                 </div>
 
                 <div id="systemStatusMessage" class="system-status normal">
@@ -517,6 +521,7 @@
             volumeValue: document.getElementById('volumeValue'),
             flowRate: document.getElementById('flowRate'),
             valveStatus: document.getElementById('valveStatus'),
+            sessionTime: document.getElementById('sessionTime'),
             systemStatusMessage: document.getElementById('systemStatusMessage'),
             volumeSinceOpen: document.getElementById('volumeSinceOpen'),
             pulseCount: document.getElementById('pulseCount'),
@@ -629,12 +634,30 @@
                 const indicatorClass = valveState === 'OPEN' ? 'status-open' : 'status-closed';
                 ui.valveStatus.innerHTML = `<span class="status-indicator ${indicatorClass}"></span>${valveState}`;
                 
+                // Update session time
+                const sessionSeconds = data.current_open_time_s || 0;
+                if (sessionSeconds > 0) {
+                    const hours = Math.floor(sessionSeconds / 3600);
+                    const minutes = Math.floor((sessionSeconds % 3600) / 60);
+                    const secs = sessionSeconds % 60;
+                    if (hours > 0) {
+                        ui.sessionTime.textContent = `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                    } else {
+                        ui.sessionTime.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+                    }
+                } else {
+                    ui.sessionTime.textContent = '0:00';
+                }
+                
                 // Update system status message
                 let statusMessage = 'System operating normally';
                 let statusClass = 'normal';
                 
                 if (data.emergency_shutoff) {
                     statusMessage = '🚨 Emergency shutdown - Dashboard was disconnected';
+                    statusClass = 'error';
+                } else if (data.sensor_lockout) {
+                    statusMessage = '🔒 Flow sensor lockout - Check sensor connection';
                     statusClass = 'error';
                 } else if (data.limit_reached) {
                     statusMessage = '⚠️ Volume limit reached - Valve auto-closed';
@@ -667,11 +690,12 @@
             const valveOpen = data.valve_state === 'OPEN';
             const limitReached = data.limit_reached;
             const emergencyShutoff = data.emergency_shutoff;
+            const sensorLockout = data.sensor_lockout;
             
             // Disable all buttons if offline or command pending
             const globalDisable = !isOnline || systemState.isCommandPending;
             
-            ui.openBtn.disabled = globalDisable || valveOpen || (limitReached && !isManual) || emergencyShutoff;
+            ui.openBtn.disabled = globalDisable || valveOpen || (limitReached && !isManual) || emergencyShutoff || sensorLockout;
             ui.closeBtn.disabled = globalDisable || !valveOpen;
             ui.resetBtn.disabled = globalDisable;
             ui.autoBtn.disabled = globalDisable;
