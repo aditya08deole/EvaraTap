@@ -503,7 +503,7 @@
         // Configuration
         const API_ENDPOINT = '/api/mqtt-proxy';
         const UPDATE_INTERVAL = 3000; // 3 seconds
-        const MAX_DATA_AGE_SECONDS = 15;
+        const MAX_DATA_AGE_SECONDS = 30;  // Increased to handle Adafruit IO delays
 
         // System state
         let systemState = {
@@ -557,9 +557,33 @@
         }
 
         function isDeviceOnline(data) {
-            if (!data || !data.last_updated) return false;
-            const secondsAgo = (new Date() - new Date(data.last_updated)) / 1000;
-            return secondsAgo <= MAX_DATA_AGE_SECONDS && data.device_heartbeat === true;
+            // Enhanced online detection with debugging
+            if (!data) {
+                console.log('🔍 Device check: No data received');
+                return false;
+            }
+            
+            if (!data.last_updated) {
+                console.log('🔍 Device check: No timestamp in data');
+                return false;
+            }
+            
+            if (data.device_heartbeat !== true) {
+                console.log('🔍 Device check: Heartbeat not true:', data.device_heartbeat);
+                return false;
+            }
+            
+            const now = new Date();
+            const dataTime = new Date(data.last_updated);
+            const secondsAgo = (now - dataTime) / 1000;
+            
+            console.log(`🔍 Device check: Data is ${secondsAgo.toFixed(1)}s old (max: ${MAX_DATA_AGE_SECONDS}s)`);
+            console.log(`🔍 Device check: Heartbeat = ${data.device_heartbeat}, Age OK = ${secondsAgo <= MAX_DATA_AGE_SECONDS}`);
+            
+            const isOnline = secondsAgo <= MAX_DATA_AGE_SECONDS;
+            console.log(`🔍 Final result: Device ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+            
+            return isOnline;
         }
 
         // Chart creation
