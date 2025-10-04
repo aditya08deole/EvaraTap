@@ -94,12 +94,23 @@ function handlePublishCommand(topic, command) {
 
         client.on('connect', () => {
             clearTimeout(timeout);
-            console.log(`✓ MQTT connected for command: ${command}`);
+            console.log(`✓ MQTT connected for command: ${typeof command === 'object' ? JSON.stringify(command) : command}`);
             
-            const messagePayload = JSON.stringify({ 
-                command: command,
-                timestamp: new Date().toISOString()
-            });
+            let messagePayload;
+            if (typeof command === 'object') {
+                // Handle settings commands
+                messagePayload = JSON.stringify({
+                    command: 'set_settings',
+                    ...command,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                // Handle simple string commands
+                messagePayload = JSON.stringify({ 
+                    command: command,
+                    timestamp: new Date().toISOString()
+                });
+            }
             
             client.publish(topic, messagePayload, { retain: false }, (err) => {
                 client.end();
