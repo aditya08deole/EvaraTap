@@ -9,7 +9,6 @@ const ADAFRUIT_IO_KEY = process.env.ADAFRUIT_IO_KEY;
 // Define MQTT topics
 const TOPIC_VALVE_CONTROL = `${ADAFRUIT_IO_USERNAME}/feeds/valve-control`;
 const TOPIC_ESP_DATA = `${ADAFRUIT_IO_USERNAME}/feeds/esp-data`;
-const TOPIC_DASHBOARD_HEARTBEAT = `${ADAFRUIT_IO_USERNAME}/feeds/dashboard-heartbeat`;
 
 /**
  * Main handler for all incoming requests
@@ -51,8 +50,7 @@ export default async function handler(request, response) {
                 });
 
             case 'get_system_status':
-                // Send heartbeat and get system status
-                await sendHeartbeat();
+                // Get system status
                 const statusData = await getSystemStatus();
                 return response.status(200).json({ 
                     status: 'success', 
@@ -133,49 +131,7 @@ function handlePublishCommand(topic, command) {
     });
 }
 
-/**
- * Sends heartbeat signal to ESP32
- */
-function sendHeartbeat() {
-    return new Promise((resolve, reject) => {
-        const client = mqtt.connect(`mqtt://${MQTT_BROKER_HOST}:${MQTT_BROKER_PORT}`, {
-            username: ADAFRUIT_IO_USERNAME,
-            password: ADAFRUIT_IO_KEY,
-            clientId: `evaratap_heartbeat_${Date.now()}`,
-            reconnectPeriod: 0,
-            connectTimeout: 8000,
-        });
 
-        const timeout = setTimeout(() => {
-            client.end(true);
-            resolve(); // Don't reject on heartbeat timeout
-        }, 10000);
-
-        client.on('connect', () => {
-            clearTimeout(timeout);
-            
-            const heartbeatPayload = JSON.stringify({
-                dashboard_alive: true,
-                timestamp: new Date().toISOString()
-            });
-            
-            client.publish(TOPIC_DASHBOARD_HEARTBEAT, heartbeatPayload, { retain: false }, (err) => {
-                client.end();
-                if (err) {
-                    console.error('❌ Heartbeat publish error:', err);
-                }
-                resolve(); // Always resolve heartbeat
-            });
-        });
-
-        client.on('error', (err) => {
-            clearTimeout(timeout);
-            client.end();
-            console.error('❌ Heartbeat MQTT error:', err);
-            resolve(); // Don't fail on heartbeat errors
-        });
-    });
-}
 
 /**
  * Fetches the latest ESP32 data from Adafruit IO

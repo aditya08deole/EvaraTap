@@ -14,12 +14,11 @@ const char* password    = "YOUR_WIFI_PASSWORD";
 const char* AIO_SERVER  = "io.adafruit.com";
 const int AIO_SERVERPORT = 1883;
 const char* AIO_USERNAME = "YOUR_ADAFRUIT_USERNAME";
-const char* AIO_KEY      = "YOUR_ADAFRUIT_KEY";
+const char* AIO_KEY      = "YOUR_ADAFRUIT_IO_KEY";
 // ---------------------------------------
 
 String VALVE_CONTROL_TOPIC       = String(AIO_USERNAME) + "/feeds/valve-control";
 String ESP_DATA_TOPIC            = String(AIO_USERNAME) + "/feeds/esp-data";
-String DASHBOARD_HEARTBEAT_TOPIC = String(AIO_USERNAME) + "/feeds/dashboard-heartbeat";
 
 const float PULSES_PER_LITER     = 367.9;
 const int PULSE_TIME             = 100;
@@ -29,7 +28,6 @@ const int PULSE_TIME             = 100;
 #define AUTO_SHUTOFF_ADDR     4
 #define TOTAL_VOLUME_ADDR     8
 
-const unsigned long HEARTBEAT_TIMEOUT    = 30000; // 30 seconds
 const unsigned long DATA_SEND_INTERVAL = 3000;  // 3 seconds
 const unsigned long READ_INTERVAL_MS   = 1000;  // 1 second
 
@@ -48,14 +46,10 @@ float volumeLimitLiters = 100.0;
 float volumeAtValveOpen = 0.0;
 float volumeSinceValveOpen = 0.0;
 bool autoShutoffEnabled = true;
-bool emergencyShutoff = false;
-
 unsigned long lastReadTime = 0;
 unsigned long lastDataSend = 0;
-unsigned long lastHeartbeat = 0;
 unsigned long valveOpenStartTime = 0;
 unsigned long lastFlowSensorActivity = 0;
-bool dashboardConnected = false;
 
 String systemMode = "AUTO"; // AUTO or MANUAL
 
@@ -109,7 +103,7 @@ void openValve() {
   // Check for sensor lockout (no flow sensor activity for 30 seconds)
   bool sensorLockout = (millis() - lastFlowSensorActivity > 30000) && (millis() > 30000);
   
-  if (!valveOpen && !limitReached && !emergencyShutoff && !sensorLockout) {
+  if (!valveOpen && !limitReached && !sensorLockout) {
     digitalWrite(RELAY_OPEN_PIN, LOW);
     delay(PULSE_TIME);
     digitalWrite(RELAY_OPEN_PIN, HIGH);
@@ -122,20 +116,12 @@ void openValve() {
     Serial.println("⚠ Cannot open valve:");
     if (valveOpen) Serial.println("  - Already open");
     if (limitReached) Serial.println("  - Volume limit reached");
-    if (emergencyShutoff) Serial.println("  - Emergency shutdown active");
     if (sensorLockout) Serial.println("  - Flow sensor lockout active");
   }
 }
 
-void emergencyCloseValve() {
-  closeValve();
-  emergencyShutoff = true;
-  Serial.println("🚨 EMERGENCY SHUTDOWN - Dashboard disconnected");
-}
-
 void resetSystem() {
   limitReached = false;
-  emergencyShutoff = false;
   totalVolumeLiters = 0;
   pulseCount = 0;
   previousPulseCount = 0;
@@ -159,19 +145,12 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
     if (command == "open") { systemMode = "MANUAL"; openValve(); } 
     else if (command == "close") { systemMode = "MANUAL"; closeValve(); } 
     else if (command == "reset") { systemMode = "AUTO"; resetSystem(); } 
-    else if (command == "auto") { systemMode = "AUTO"; emergencyShutoff = false; Serial.println("🔄 Switched to AUTO mode"); } 
+    else if (command == "auto") { systemMode = "AUTO"; Serial.println("🔄 Switched to AUTO mode"); } 
     else if (command == "set_config") {
       if (doc.containsKey("volume_limit")) { volumeLimitLiters = doc["volume_limit"]; }
       if (doc.containsKey("auto_shutoff")) { autoShutoffEnabled = doc["auto_shutoff"]; }
       saveSettings();
       Serial.println("⚙️ Settings updated from dashboard");
-    }
-  } else if (String(topic) == DASHBOARD_HEARTBEAT_TOPIC) {
-    lastHeartbeat = millis();
-    dashboardConnected = true;
-    if (emergencyShutoff && systemMode == "AUTO") {
-      emergencyShutoff = false;
-      Serial.println("💚 Dashboard reconnected - Emergency shutdown cleared");
     }
   }
 }
@@ -184,8 +163,6 @@ void sendSensorData() {
   doc["device_heartbeat"] = true;
   doc["valve_state"] = valveOpen ? "ON" : "OFF";
   doc["system_mode"] = systemMode;
-  doc["dashboard_connected"] = dashboardConnected;
-  doc["emergency_shutoff"] = emergencyShutoff;
   
   // Safety Features
   bool sensorLockout = (millis() - lastFlowSensorActivity > 30000) && (millis() > 30000);
@@ -213,8 +190,7 @@ void MQTT_connect() {
     if (mqtt.connect("ESP32_EvaraTap", AIO_USERNAME, AIO_KEY)) {
       Serial.println("✓ MQTT Connected!");
       mqtt.subscribe(VALVE_CONTROL_TOPIC.c_str());
-      mqtt.subscribe(DASHBOARD_HEARTBEAT_TOPIC.c_str());
-      Serial.println("📡 Subscribed to control and heartbeat topics.");
+      Serial.println("📡 Subscribed to control topic.");
     } else {
       Serial.printf("❌ Failed, rc=%d. Retrying in 5 seconds...\n", mqtt.state());
       delay(5000);
@@ -249,7 +225,6 @@ void setup() {
   
   lastReadTime = millis();
   lastDataSend = millis();
-  lastHeartbeat = millis();
 
   Serial.println("🚀 EvaraTap system ready!");
   Serial.println("=====================================");
@@ -262,9 +237,10 @@ void loop() {
   mqtt.loop();
 
   if (now - lastReadTime >= READ_INTERVAL_MS) {
-    detachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN));
-    unsigned long currentPulses = pulseCount;
-    attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN), flowSensorISR, RISING);
+    unsigned long currentPulses;
+    noInterrupts(); // Pause all interrupts safely
+    currentPulses = pulseCount;
+    interrupts(); // Resume all interrupts
     
     unsigned long pulsesThisInterval = currentPulses - previousPulseCount;
     currentFlowRateLPS = (float)pulsesThisInterval / PULSES_PER_LITER / (READ_INTERVAL_MS / 1000.0);
@@ -293,15 +269,5 @@ void loop() {
     lastDataSend = now;
   }
 
-  if (now - lastHeartbeat > HEARTBEAT_TIMEOUT) {
-    if (dashboardConnected) {
-      dashboardConnected = false;
-      Serial.println("💔 Dashboard connection lost");
-      if (systemMode == "AUTO" && valveOpen && !emergencyShutoff) {
-        emergencyCloseValve();
-      }
-    }
-  }
   delay(10);
 }
-
