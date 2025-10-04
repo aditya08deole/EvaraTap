@@ -20,26 +20,27 @@ const TOPIC_ESP32_COMMANDS = `${ADAFRUIT_IO_USERNAME}/feeds/esp32-commands`;
  * Main handler for all incoming requests - EXACTLY like reference
  */
 exports.handler = async function(event, context) {
+    // Add debugging logs
+    console.log('🔧 Function invoked - Method:', event.httpMethod);
+    console.log('📦 Raw body:', event.body);
+    
     const request = {
         method: event.httpMethod,
-        body: JSON.parse(event.body || '{}')
+        body: event.body ? JSON.parse(event.body) : {}
     };
     
-    const response = {
-        statusCode: 200,
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Content-Type': 'application/json'
-        },
-        body: ''
-    };
-    
-    const sendResponse = (code, data) => {
-        response.statusCode = code;
-        response.body = JSON.stringify(data);
-        return response;
+    // Create a proper response function - don't modify shared objects
+    const sendResponse = (statusCode, data) => {
+        return {
+            statusCode: statusCode,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        };
     };
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
