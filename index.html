@@ -4,548 +4,160 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EvaraTap Flow Control System</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style> 
+        :root {
+            --primary-bg: #0a0e14;
+            --secondary-bg: #161b22;
+            --border-color: #30363d;  
+            --primary-text: #c9d1d9;
+            --heading-text: #58a6ff;
+            --success-color: #238636;
+            --success-glow: rgba(35, 134, 54, 0.5);
+            --error-color: #da3633;
+            --error-glow: rgba(218, 54, 51, 0.4);
+            --pending-color: #dbab09;
+            --valve-color: #3e92cc;
+            --valve-color-light: #6ab1d7;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
-            color: #333;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--primary-text);
             min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-
-        h1 {
-            font-size: 2.8rem;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-
-        .subtitle {
-            font-size: 1.2rem;
-            opacity: 0.9;
-            margin-bottom: 20px;
-        }
-
-        .system-status-bar {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-
-        .status-badge {
-            padding: 8px 16px;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .status-online { background: rgba(46, 204, 113, 0.9); color: white; }
-        .status-offline { background: rgba(231, 76, 60, 0.9); color: white; }
-        .status-manual { background: rgba(52, 152, 219, 0.9); color: white; }
-        .status-auto { background: rgba(155, 89, 182, 0.9); color: white; }
-
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-            gap: 25px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-        }
-
-        .card-title {
-            font-size: 1.6rem;
-            margin-bottom: 20px;
-            color: #2c3e50;
-            text-align: center;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
-            font-weight: 600;
-        }
-
-        /* Gauge Styles */
-        .gauge-wrapper {
-            position: relative;
-            width: 100%;
-            margin: 20px auto;
-        }
-
-        .gauge-container {
-            position: relative;
-            width: 100%;
-            height: 250px;
-            margin: 0 auto;
-        }
-
-        .gauge-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        .gauge-text {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-        }
-
-        .gauge-value {
-            font-size: 2.8rem;
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 5px;
-        }
-
-        .gauge-label {
-            font-size: 1.3rem;
-            color: #7f8c8d;
-            font-weight: 500;
-        }
-
-        /* Stats Grid */
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 25px;
-        }
-
-        .stat-item {
-            text-align: center;
-            padding: 15px;
-            background: linear-gradient(145deg, #f8f9fa, #e9ecef);
-            border-radius: 12px;
-            border-left: 4px solid #3498db;
-            transition: transform 0.2s ease;
-        }
-
-        .stat-item:hover {
-            transform: scale(1.05);
-        }
-
-        .stat-value {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
-            color: #7f8c8d;
-            font-weight: 500;
-        }
-
-        /* Status Indicators */
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: pulse 2s infinite;
-        }
-
-        .status-open { background-color: #2ecc71; }
-        .status-closed { background-color: #e74c3c; }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        /* Control Buttons */
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 25px;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            min-width: 140px;
-        }
-
-        .btn-open {
-            background: linear-gradient(135deg, #2ecc71, #27ae60);
-            color: white;
-        }
-
-        .btn-close {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: white;
-        }
-
-        .btn-reset {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            color: white;
-        }
-
-        .btn-auto {
-            background: linear-gradient(135deg, #9b59b6, #8e44ad);
-            color: white;
-        }
-
-        .btn:disabled {
-            background: #95a5a6;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .btn:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-        }
-
-        /* Settings Panel */
-        .settings-panel {
-            margin-top: 25px;
             padding: 20px;
-            background: linear-gradient(145deg, #f8f9fa, #e9ecef);
-            border-radius: 15px;
-            border: 1px solid #dee2e6;
         }
-
-        .settings-panel h3 {
-            margin-bottom: 20px;
-            color: #2c3e50;
+        .header { text-align: center; margin-bottom: 30px; width: 100%; max-width: 800px; }
+        .header h1 { color: var(--heading-text); font-size: clamp(1.8rem, 5vw, 2.5rem); margin-bottom: 5px; }
+        .header p { color: var(--primary-text); font-size: 1.1em; font-style: italic; opacity: 0.8; }
+        .dashboard-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 25px; width: 100%; max-width: 1200px; }
+        .panel {
+            background: linear-gradient(145deg, #1a2029, #13171f);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            border-radius: 16px;
             text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-
-        .input-group {
-            margin-bottom: 20px;
+        .panel.online-device {
+            border-color: var(--success-color);
+            box-shadow: 0 0 20px var(--success-glow);
         }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
+        .panel.offline-device {
+            border-color: var(--error-color);
+            box-shadow: 0 0 15px var(--error-glow);
+        }
+        .panel-header { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 25px; }
+        .panel-header svg { width: 28px; height: 28px; color: var(--heading-text); }
+        .panel-header h2 { color: var(--heading-text); font-size: 1.6em; margin: 0; }
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
             font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .input-group input[type="number"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .input-group input[type="number"]:focus {
-            border-color: #3498db;
-            outline: none;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .checkbox-group input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-        }
-
-        /* System Status Messages */
-        .system-status {
-            text-align: center;
-            padding: 15px;
-            margin-top: 20px;
-            border-radius: 10px;
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-
-        .system-status.normal {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .system-status.warning {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-
-        .system-status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        /* Toast Notifications */
-        .toast-notification {
-            position: fixed;
-            bottom: -100px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 15px 25px;
-            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
             color: white;
-            font-weight: 600;
-            z-index: 1000;
-            transition: all 0.5s ease;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
         }
-
-        .toast-notification.show {
-            bottom: 30px;
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: all 0.5s;
         }
-
-        .toast-notification.success {
-            background: linear-gradient(135deg, #2ecc71, #27ae60);
+        .btn:hover:not(:disabled):before { left: 100%; }
+        .btn:disabled { cursor: not-allowed; opacity: 0.6; }
+        .btn-on { background: linear-gradient(145deg, #28a745, #218838); }
+        .btn-off { background: linear-gradient(145deg, #dc3545, #c82333); }
+        .btn-reset { background: linear-gradient(145deg, #ffc107, #e0a800); color: #000; }
+        .btn-auto { background: linear-gradient(145deg, #17a2b8, #138496); }
+        .status-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; margin-bottom: 12px; background: var(--primary-bg); border-left: 5px solid var(--heading-text); border-radius: 8px; transition: all 0.2s ease; }
+        .status-item:hover { transform: scale(1.02); background-color: #222831; }
+        .status-label { font-weight: 500; opacity: 0.9; }
+        .status-value { font-weight: 700; }
+        .status-on { color: var(--success-color); }
+        .status-off { color: var(--error-color); }
+        .status-pending { color: var(--pending-color); }
+        .status-lockout { color: var(--error-color); font-weight: 700; }
+        .device-status-indicator {
+            position: absolute; top: 15px; right: 20px; padding: 5px 12px;
+            border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;
         }
-
-        .toast-notification.error {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            h1 {
-                font-size: 2.2rem;
-            }
-            
-            .dashboard {
-                grid-template-columns: 1fr;
-            }
-            
-            .gauge-container {
-                height: 200px;
-            }
-            
-            .gauge-value {
-                font-size: 2.2rem;
-            }
-            
-            .stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .controls {
-                flex-direction: column;
-            }
-            
-            .btn {
-                width: 100%;
-            }
-        }
+        .device-status-indicator.online { background-color: var(--success-color); color: white; animation: pulse 2s infinite; }
+        .device-status-indicator.offline { background-color: var(--error-color); color: white; }
+        .toast-notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 10px; color: white; font-weight: 600; z-index: 1000; transition: all 0.5s ease; }
+        .toast-notification.show { bottom: 20px; }
+        .toast-notification.success { background-color: var(--success-color); }
+        .toast-notification.error { background-color: var(--error-color); }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--success-glow); } 70% { box-shadow: 0 0 0 10px rgba(35, 134, 54, 0); } 100% { box-shadow: 0 0 0 0 rgba(35, 134, 54, 0); } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🌊 EvaraTap Flow Control</h1>
-            <p class="subtitle">Advanced Water Management System</p>
-        </header>
-
-        <div class="system-status-bar">
-            <div id="espStatus" class="status-badge status-offline">ESP32: Offline</div>
-            <div id="dashboardStatus" class="status-badge status-online">Dashboard: Online</div>
-            <div id="systemMode" class="status-badge status-auto">Mode: Auto</div>
-        </div>
-
-        <div class="dashboard">
-            <!-- Volume Monitoring Card -->
-            <div class="card">
-                <h2 class="card-title">💧 Volume Monitor</h2>
-                <div class="gauge-wrapper">
-                    <div class="gauge-container">
-                        <canvas id="volumeGauge" class="gauge-canvas"></canvas>
-                        <div class="gauge-text">
-                            <div class="gauge-value" id="volumeValue">0.0</div>
-                            <div class="gauge-label">Liters</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-value" id="flowRate">0.0</div>
-                        <div class="stat-label">Flow Rate (L/min)</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="valveStatus">
-                            <span class="status-indicator status-closed"></span>
-                            CLOSED
-                        </div>
-                        <div class="stat-label">Valve Status</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="sessionTime">0:00</div>
-                        <div class="stat-label">Session Time</div>
-                    </div>
-                </div>
-
-                <div id="systemStatusMessage" class="system-status normal">
-                    System operating normally
-                </div>
+    <div class="header">
+        <h1>EvaraTap Flow Control System</h1>
+        <p>Advanced Water Management by Evara IoT</p>
+    </div>
+    <div class="dashboard-container">
+        <div id="valvePanel" class="panel">
+            <div id="valveControllerStatus" class="device-status-indicator offline">Offline</div>
+            <div class="panel-header">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 5.438a.75.75 0 0 0 .634.893l.3.053a.75.75 0 0 1 .634.893l-.173 1.04a.75.75 0 0 0 .33.832l.3.173a.75.75 0 0 1 .33.832l-.173 1.04a.75.75 0 0 0 .33.832l.3.173a.75.75 0 0 1 .33.832l-.173 1.04a.75.75 0 0 0 .33.832l.3.173a.75.75 0 0 1 .33.832l-.173 1.04a.75.75 0 0 0 .634.893l.3.053a.75.75 0 0 1 .634.893l-1.732 1.04a1.875 1.875 0 0 1-1.85 1.567h-1.156a1.875 1.875 0 0 1-1.85-1.567L6.05 16.562a.75.75 0 0 0-.634-.893l-.3-.053a.75.75 0 0 1-.634-.893l.173-1.04a.75.75 0 0 0-.33-.832l-.3-.173a.75.75 0 0 1-.33-.832l.173-1.04a.75.75 0 0 0-.33-.832l-.3-.173a.75.75 0 0 1-.33-.832l.173-1.04a.75.75 0 0 0-.33-.832l-.3-.173a.75.75 0 0 1-.33-.832l.173-1.04a.75.75 0 0 0-.634-.893l-.3-.053a.75.75 0 0 1-.634-.893L5.95 3.817a1.875 1.875 0 0 1 1.85-1.567h1.156Z" clip-rule="evenodd" /><path d="M13.26 21.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z" /></svg>
+                <h2>Valve Control</h2>
             </div>
-
-            <!-- Control Panel Card -->
-            <div class="card">
-                <h2 class="card-title">🎛️ System Controls</h2>
-                
-                <div class="controls">
-                    <button class="btn btn-open" id="openBtn" data-command="open">
-                        Open Valve
-                    </button>
-                    <button class="btn btn-close" id="closeBtn" data-command="close">
-                        Close Valve
-                    </button>
-                    <button class="btn btn-reset" id="resetBtn" data-command="reset">
-                        Reset System
-                    </button>
-                    <button class="btn btn-auto" id="autoBtn" data-command="auto">
-                        Auto Mode
-                    </button>
-                </div>
-
-                <div class="settings-panel">
-                    <h3>⚙️ Volume Control Settings</h3>
-                    
-                    <div class="input-group">
-                        <label for="volumeLimit">Volume Limit (Liters)</label>
-                        <input type="number" id="volumeLimit" min="0.5" step="0.5" value="100.0">
-                    </div>
-                    
-                    <div class="input-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="autoShutoff" checked>
-                            <label for="autoShutoff">Enable Automatic Shutoff</label>
-                        </div>
-                    </div>
-                    
-                    <button class="btn" onclick="saveSettings()" style="background: linear-gradient(135deg, #17a2b8, #138496); color: white; width: 100%;">
-                        💾 Save Settings
-                    </button>
-                </div>
-
-                <div class="stats" style="margin-top: 20px;">
-                    <div class="stat-item">
-                        <div class="stat-value" id="volumeSinceOpen">0.0</div>
-                        <div class="stat-label">Volume Since Open (L)</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="pulseCount">0</div>
-                        <div class="stat-label">Total Pulses</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="lastUpdate">Never</div>
-                        <div class="stat-label">Last Update</div>
-                    </div>
-                </div>
+            <div class="status-item"><span class="status-label">System Status</span><span class="status-value" id="systemStatus">--</span></div>
+            <div class="status-item"><span class="status-label">Valve State</span><span class="status-value" id="valveStatus">UNKNOWN</span></div>
+            <div class="status-item"><span class="status-label">System Mode</span><span class="status-value" id="systemMode">--</span></div>
+            <div class="status-item"><span class="status-label">Flow Rate</span><span class="status-value" id="flowRate">-- L/min</span></div>
+            <div class="status-item"><span class="status-label">Total Volume</span><span class="status-value" id="totalVolume">-- L</span></div>
+            <div class="status-item"><span class="status-label">Session Volume</span><span class="status-value" id="sessionVolume">-- L</span></div>
+            <div class="status-item"><span class="status-label">Volume Limit</span><span class="status-value" id="volumeLimit">-- L</span></div>
+            <div class="status-item"><span class="status-label">Last Update</span><span class="status-value" id="lastUpdate">Never</span></div>
+            <div class="button-group" style="margin-top: 30px;" id="controlButtons">
+                <button class="btn btn-on" data-command="open">Open Valve</button>
+                <button class="btn btn-off" data-command="close">Close Valve</button>
+                <button class="btn btn-reset" data-command="reset">Reset System</button>
+                <button class="btn btn-auto" data-command="auto">Auto Mode</button>
             </div>
         </div>
     </div>
-
-    <!-- Toast Notification -->
     <div id="toast" class="toast-notification"></div>
-
+    
     <script>
-        // Configuration
-        const API_ENDPOINT = '/api/mqtt-proxy';
-        const UPDATE_INTERVAL = 3000; // 3 seconds
-        const MAX_DATA_AGE_SECONDS = 15;  // Responsive detection like motorControl project
+        const MQTT_PROXY_ENDPOINT = "/api/mqtt-proxy";
+        const STATUS_REFRESH_INTERVAL = 3000;
+        const MAX_DATA_AGE_SECONDS = 15;
 
-        // System state
-        let systemState = {
-            esp_data: null,
-            isCommandPending: false,
-            lastUpdateTime: null
-        };
+        let systemState = { esp_data: null, isCommandPending: false };
+        let statusIntervalId = null; 
 
-        // UI elements
-        const ui = {
-            toast: document.getElementById('toast'),
-            espStatus: document.getElementById('espStatus'),
-            dashboardStatus: document.getElementById('dashboardStatus'),
-            systemMode: document.getElementById('systemMode'),
-            volumeValue: document.getElementById('volumeValue'),
-            flowRate: document.getElementById('flowRate'),
-            valveStatus: document.getElementById('valveStatus'),
-            sessionTime: document.getElementById('sessionTime'),
-            systemStatusMessage: document.getElementById('systemStatusMessage'),
-            volumeSinceOpen: document.getElementById('volumeSinceOpen'),
-            pulseCount: document.getElementById('pulseCount'),
-            lastUpdate: document.getElementById('lastUpdate'),
-            volumeLimit: document.getElementById('volumeLimit'),
-            autoShutoff: document.getElementById('autoShutoff'),
-            openBtn: document.getElementById('openBtn'),
-            closeBtn: document.getElementById('closeBtn'),
-            resetBtn: document.getElementById('resetBtn'),
-            autoBtn: document.getElementById('autoBtn')
-        };
+        const ui = {};
 
-        let volumeChart = null;
-
-        // Utility functions
-        function showToast(message, type = 'error') {
+        const showToast = (message, type = 'error') => {
             ui.toast.textContent = message;
             ui.toast.className = `toast-notification ${type} show`;
             setTimeout(() => {
                 ui.toast.className = 'toast-notification';
-            }, 4000);
-        }
+            }, 3000);
+        };
 
-        function formatTimeAgo(isoString) {
+        const formatTimeAgo = (isoString) => {
             if (!isoString) return "Never";
             const seconds = Math.round((new Date() - new Date(isoString)) / 1000);
             if (seconds < 5) return "Just now";
@@ -554,329 +166,129 @@
             if (minutes < 60) return `${minutes}m ago`;
             const hours = Math.floor(minutes / 60);
             return `${hours}h ago`;
-        }
+        };
 
-        function isDeviceOnline(data) {
-            // Enhanced online detection with debugging
-            if (!data) {
-                console.log('🔍 Device check: No data received');
-                return false;
-            }
-            
-            if (!data.last_updated) {
-                console.log('🔍 Device check: No timestamp in data');
-                return false;
-            }
-            
-            if (data.device_heartbeat !== true) {
-                console.log('🔍 Device check: Heartbeat not true:', data.device_heartbeat);
-                return false;
-            }
-            
-            const now = new Date();
-            const dataTime = new Date(data.last_updated);
-            const secondsAgo = (now - dataTime) / 1000;
-            
-            console.log(`🔍 Device check: Data is ${secondsAgo.toFixed(1)}s old (max: ${MAX_DATA_AGE_SECONDS}s)`);
-            console.log(`🔍 Device check: Heartbeat = ${data.device_heartbeat}, Age OK = ${secondsAgo <= MAX_DATA_AGE_SECONDS}`);
-            
-            const isOnline = secondsAgo <= MAX_DATA_AGE_SECONDS;
-            console.log(`🔍 Final result: Device ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
-            
-            return isOnline;
-        }
+        const isDeviceOnline = (data) => {
+            const isStale = !data || !data.last_updated || (new Date() - new Date(data.last_updated)) / 1000 > MAX_DATA_AGE_SECONDS;
+            if (isStale) return false;
+            return data.device_heartbeat === true;
+        };
 
-        // Chart creation
-        function createVolumeGauge() {
-            const canvas = document.getElementById('volumeGauge');
-            const container = canvas.parentElement;
-            
-            canvas.width = container.offsetWidth;
-            canvas.height = container.offsetHeight;
-            
-            const ctx = canvas.getContext('2d');
-            
-            if (volumeChart) {
-                volumeChart.destroy();
-            }
-            
+        const updateUI = () => {
+            const deviceOnline = isDeviceOnline(systemState.esp_data);
+            updateDeviceStatusIndicator(ui.valveControllerStatus, ui.valvePanel, deviceOnline);
+            updateValvePanel(deviceOnline);
+        };
+
+        const updateDeviceStatusIndicator = (indicatorEl, panelEl, isOnline) => {
+            indicatorEl.textContent = isOnline ? 'Online' : 'Offline';
+            indicatorEl.className = `device-status-indicator ${isOnline ? 'online' : 'offline'}`;
+            panelEl.classList.toggle('online-device', isOnline);
+            panelEl.classList.toggle('offline-device', !isOnline);
+        };
+
+        const updateValvePanel = (isOnline) => {
             const data = systemState.esp_data;
-            const currentVolume = data ? (data.total_volume_liters || 0) : 0;
-            const volumeLimit = data ? (data.volume_limit_liters || 100) : 100;
-            const remainingVolume = Math.max(0, volumeLimit - currentVolume);
-            
-            volumeChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    datasets: [{
-                        data: [currentVolume, remainingVolume],
-                        backgroundColor: [
-                            currentVolume > volumeLimit * 0.8 ? '#e74c3c' : '#3498db',
-                            '#ecf0f1'
-                        ],
-                        borderWidth: 0,
-                        borderRadius: 8,
-                        circumference: 180,
-                        rotation: -90
-                    }]
-                },
-                options: {
-                    cutout: '75%',
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { enabled: false }
-                    },
-                    maintainAspectRatio: false,
-                    responsive: true
-                }
-            });
-        }
+            const isSensorLockout = isOnline && data && data.sensor_lockout === true;
 
-        // UI update functions
-        function updateUI() {
-            const data = systemState.esp_data;
-            const isOnline = isDeviceOnline(data);
-            
-            // Update status indicators
-            ui.espStatus.textContent = `ESP32: ${isOnline ? 'Online' : 'Offline'}`;
-            ui.espStatus.className = `status-badge ${isOnline ? 'status-online' : 'status-offline'}`;
-            
-            if (data) {
-                // Update system mode
-                const mode = data.system_mode || 'AUTO';
-                ui.systemMode.textContent = `Mode: ${mode}`;
-                ui.systemMode.className = `status-badge ${mode === 'MANUAL' ? 'status-manual' : 'status-auto'}`;
-                
-                // Update volume and flow data
-                ui.volumeValue.textContent = (data.total_volume_liters || 0).toFixed(1);
-                ui.flowRate.textContent = ((data.flow_rate_lpm || 0)).toFixed(1);
-                ui.volumeSinceOpen.textContent = (data.volume_since_open || 0).toFixed(1);
-                ui.pulseCount.textContent = (data.pulse_count || 0).toLocaleString();
-                
-                // Update valve status
-                const valveState = data.valve_state || 'CLOSED';
-                const indicatorClass = valveState === 'OPEN' ? 'status-open' : 'status-closed';
-                ui.valveStatus.innerHTML = `<span class="status-indicator ${indicatorClass}"></span>${valveState}`;
-                
-                // Update session time
-                const sessionSeconds = data.current_open_time_s || 0;
-                if (sessionSeconds > 0) {
-                    const hours = Math.floor(sessionSeconds / 3600);
-                    const minutes = Math.floor((sessionSeconds % 3600) / 60);
-                    const secs = sessionSeconds % 60;
-                    if (hours > 0) {
-                        ui.sessionTime.textContent = `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                    } else {
-                        ui.sessionTime.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
-                    }
-                } else {
-                    ui.sessionTime.textContent = '0:00';
-                }
-                
-                // Update system status message
-                let statusMessage = 'System operating normally';
-                let statusClass = 'normal';
-                
-                if (data.emergency_shutoff) {
-                    statusMessage = '🚨 Emergency shutdown - Dashboard was disconnected';
-                    statusClass = 'error';
-                } else if (data.sensor_lockout) {
-                    statusMessage = '🔒 Flow sensor lockout - Check sensor connection';
-                    statusClass = 'error';
-                } else if (data.limit_reached) {
-                    statusMessage = '⚠️ Volume limit reached - Valve auto-closed';
-                    statusClass = 'warning';
-                } else if (!isOnline) {
-                    statusMessage = '⚠️ Device offline - Check connection';
-                    statusClass = 'warning';
-                }
-                
-                ui.systemStatusMessage.textContent = statusMessage;
-                ui.systemStatusMessage.className = `system-status ${statusClass}`;
-                
-                // Update settings
-                ui.volumeLimit.value = (data.volume_limit_liters || 100).toFixed(1);
-                ui.autoShutoff.checked = data.auto_shutoff_enabled !== false;
-                
-                // Update last update time
-                ui.lastUpdate.textContent = formatTimeAgo(data.last_updated);
-                
-                // Update button states
-                updateButtonStates(data, isOnline);
+            const buttonsDisabled = !isOnline || isSensorLockout;
+            ui.controlButtons.querySelectorAll('button').forEach(btn => btn.disabled = buttonsDisabled);
+
+            if (isSensorLockout) {
+                ui.systemStatus.textContent = 'SENSOR LOCKOUT';
+                ui.systemStatus.className = 'status-value status-lockout';
+            } else {
+                ui.systemStatus.textContent = isOnline ? 'Operational' : 'Offline';
+                ui.systemStatus.className = `status-value ${isOnline ? 'status-on' : 'status-off'}`;
             }
             
-            // Update chart
-            createVolumeGauge();
-        }
-
-        function updateButtonStates(data, isOnline) {
-            const isManual = data.system_mode === 'MANUAL';
-            const valveOpen = data.valve_state === 'OPEN';
-            const limitReached = data.limit_reached;
-            const emergencyShutoff = data.emergency_shutoff;
-            const sensorLockout = data.sensor_lockout;
-            
-            // Disable all buttons if offline or command pending
-            const globalDisable = !isOnline || systemState.isCommandPending;
-            
-            ui.openBtn.disabled = globalDisable || valveOpen || (limitReached && !isManual) || emergencyShutoff || sensorLockout;
-            ui.closeBtn.disabled = globalDisable || !valveOpen;
-            ui.resetBtn.disabled = globalDisable;
-            ui.autoBtn.disabled = globalDisable;
-            
-            // Update button text based on mode
-            ui.autoBtn.textContent = isManual ? 'Switch to Auto' : 'Auto Mode Active';
-        }
-
-        // API communication
-        async function sendCommand(command, payload = null) {
             if (systemState.isCommandPending) {
-                showToast('Command already in progress', 'error');
-                return;
+                ui.valveStatus.textContent = 'Pending...';
+                ui.valveStatus.className = 'status-value status-pending';
+            } else {
+                const state = isOnline && data && data.valve_state ? data.valve_state : 'UNKNOWN';
+                ui.valveStatus.textContent = state;
+                ui.valveStatus.className = `status-value status-${state.toLowerCase()}`;
             }
 
+            ui.systemMode.textContent = isOnline && data && data.system_mode ? data.system_mode : '--';
+            ui.flowRate.textContent = isOnline && data && data.flow_rate_lpm !== undefined ? `${data.flow_rate_lpm.toFixed(1)} L/min` : '-- L/min';
+            ui.totalVolume.textContent = isOnline && data && data.total_volume_liters !== undefined ? `${data.total_volume_liters.toFixed(1)} L` : '-- L';
+            ui.sessionVolume.textContent = isOnline && data && data.volume_since_open !== undefined ? `${data.volume_since_open.toFixed(1)} L` : '-- L';
+            ui.volumeLimit.textContent = isOnline && data && data.volume_limit_liters !== undefined ? `${data.volume_limit_liters.toFixed(1)} L` : '-- L';
+            ui.lastUpdate.textContent = isOnline && data ? formatTimeAgo(data.last_updated) : 'Never';
+        };
+
+        const handleCommand = async (command) => {
+            clearInterval(statusIntervalId);
             systemState.isCommandPending = true;
-            updateUI();
+            ui.controlButtons.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            updateUI(); 
 
             try {
-                const body = {
-                    action: 'send_valve_command',
-                    payload: payload || command
-                };
-
-                const response = await fetch(API_ENDPOINT, {
+                const response = await fetch(MQTT_PROXY_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify({ action: 'send_valve_command', payload: command })
                 });
-
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.details || `HTTP ${response.status}`);
+                    const errorDetails = (await response.json()).details || `HTTP ${response.status}`;
+                    throw new Error(errorDetails);
                 }
-
-                showToast(`Command "${command}" sent successfully!`, 'success');
-                
-                // Refresh data after a short delay
-                setTimeout(getSystemStatus, 1000);
-
+                showToast(`${command.toUpperCase()} command sent successfully.`, 'success');
+                setTimeout(getSystemStatus, 500);
             } catch (error) {
-                console.error('Command error:', error);
                 showToast(`Command failed: ${error.message}`, 'error');
-            } finally {
                 systemState.isCommandPending = false;
+                updateUI();
+            } finally {
+                statusIntervalId = setInterval(getSystemStatus, STATUS_REFRESH_INTERVAL);
             }
-        }
+        };
 
-        async function getSystemStatus() {
+        const getSystemStatus = async () => {
             try {
-                const response = await fetch(API_ENDPOINT, {
+                const response = await fetch(MQTT_PROXY_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'get_system_status' })
                 });
-
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.details || `Server error: ${response.status}`);
+                    const err = await response.json().catch(() => ({ details: `Server returned an error: ${response.status}` }));
+                    throw new Error(err.details);
                 }
-
                 const result = await response.json();
                 systemState.esp_data = result.data.esp_data;
-                systemState.lastUpdateTime = new Date();
-                
-                // Clear command pending state
                 systemState.isCommandPending = false;
-
             } catch (error) {
-                console.error('Failed to get system status:', error);
+                console.error("Failed to get system status:", error.message);
                 systemState.esp_data = null;
-                
-                // Don't show toast on every failed request to avoid spam
-                if (Math.random() < 0.1) { // Show error 10% of the time
-                    showToast('Connection error - retrying...', 'error');
-                }
             }
-
             updateUI();
-        }
+        };
 
-        function saveSettings() {
-            const volumeLimit = parseFloat(ui.volumeLimit.value);
-            const autoShutoff = ui.autoShutoff.checked;
-            
-            if (isNaN(volumeLimit) || volumeLimit < 0.5) {
-                showToast('Please enter a valid volume limit (minimum 0.5L)', 'error');
-                return;
-            }
-            
-            sendCommand('set_settings', {
-                volume_limit: volumeLimit,
-                auto_shutoff: autoShutoff
-            });
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            ui.toast = document.getElementById('toast');
+            ui.valvePanel = document.getElementById('valvePanel');
+            ui.valveControllerStatus = document.getElementById('valveControllerStatus');
+            ui.systemStatus = document.getElementById('systemStatus');
+            ui.valveStatus = document.getElementById('valveStatus');
+            ui.systemMode = document.getElementById('systemMode');
+            ui.flowRate = document.getElementById('flowRate');
+            ui.totalVolume = document.getElementById('totalVolume');
+            ui.sessionVolume = document.getElementById('sessionVolume');
+            ui.volumeLimit = document.getElementById('volumeLimit');
+            ui.lastUpdate = document.getElementById('lastUpdate');
+            ui.controlButtons = document.getElementById('controlButtons');
 
-        // Event handlers
-        function setupEventHandlers() {
-            // Control button handlers
-            ui.openBtn.addEventListener('click', () => sendCommand('open'));
-            ui.closeBtn.addEventListener('click', () => sendCommand('close'));
-            ui.resetBtn.addEventListener('click', () => {
-                if (confirm('Are you sure you want to reset the system? This will clear all volume data.')) {
-                    sendCommand('reset');
+            ui.controlButtons.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON' && !e.target.disabled) {
+                    handleCommand(e.target.dataset.command);
                 }
             });
-            ui.autoBtn.addEventListener('click', () => sendCommand('auto'));
 
-            // Settings handlers
-            ui.volumeLimit.addEventListener('blur', saveSettings);
-            ui.autoShutoff.addEventListener('change', saveSettings);
-
-            // Keyboard shortcuts
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey || e.altKey) return;
-                
-                switch(e.key.toLowerCase()) {
-                    case 'o':
-                        if (!ui.openBtn.disabled) sendCommand('open');
-                        break;
-                    case 'c':
-                        if (!ui.closeBtn.disabled) sendCommand('close');
-                        break;
-                    case 'r':
-                        if (!ui.resetBtn.disabled && confirm('Reset system?')) sendCommand('reset');
-                        break;
-                    case 'a':
-                        if (!ui.autoBtn.disabled) sendCommand('auto');
-                        break;
-                }
-            });
-        }
-
-        // Initialization
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🌊 EvaraTap Dashboard initialized');
-            
-            setupEventHandlers();
-            
-            // Initial data fetch
             getSystemStatus();
-            
-            // Set up periodic updates
-            setInterval(getSystemStatus, UPDATE_INTERVAL);
-            
-            // Handle window resize for chart responsiveness
-            window.addEventListener('resize', createVolumeGauge);
-            
-            showToast('Dashboard connected successfully!', 'success');
-        });
-
-        // Handle page visibility changes
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                // Refresh data when page becomes visible
-                getSystemStatus();
-            }
+            statusIntervalId = setInterval(getSystemStatus, STATUS_REFRESH_INTERVAL);
         });
     </script>
 </body>
