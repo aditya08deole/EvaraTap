@@ -26,7 +26,17 @@
             background: rgba(255,255,255,0.95); 
             border-radius: 15px; 
             padding: 20px; 
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2); 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .card.online-device {
+            border: 2px solid #2ecc71;
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.3), 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .card.offline-device {
+            border: 2px solid #e74c3c;
+            box-shadow: 0 0 15px rgba(231, 76, 60, 0.3), 0 10px 20px rgba(0,0,0,0.2);
         }
         .card-title { 
             font-size: 1.5rem; 
@@ -81,7 +91,19 @@
             border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;
             background-color: #2ecc71; color: white;
         }
-        .device-status-indicator.offline { background-color: #e74c3c; }
+        .device-status-indicator.online { 
+            background-color: #2ecc71; 
+            animation: pulse 2s infinite; 
+        }
+        .device-status-indicator.offline { 
+            background-color: #e74c3c; 
+            animation: none;
+        }
+        @keyframes pulse { 
+            0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); } 
+            70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); } 
+            100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); } 
+        }
         .toast-notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 10px; color: white; font-weight: 600; z-index: 1000; transition: all 0.5s ease; }
         .toast-notification.show { bottom: 20px; }
         .toast-notification.success { background-color: #2ecc71; }
@@ -197,9 +219,35 @@
         };
 
         const isDeviceOnline = (data) => {
-            const isStale = !data || !data.last_updated || (new Date() - new Date(data.last_updated)) / 1000 > MAX_DATA_AGE_SECONDS;
-            if (isStale) return false;
-            return data.device_heartbeat === true;
+            // Enhanced online detection with debugging
+            console.log('🔍 Checking device online status...');
+            
+            if (!data) {
+                console.log('🔍 Device check: No data received');
+                return false;
+            }
+            
+            if (!data.last_updated) {
+                console.log('🔍 Device check: No last_updated timestamp');
+                return false;
+            }
+            
+            if (data.device_heartbeat !== true) {
+                console.log('🔍 Device check: Heartbeat not true:', data.device_heartbeat);
+                return false;
+            }
+            
+            const now = new Date();
+            const dataTime = new Date(data.last_updated);
+            const secondsAgo = (now - dataTime) / 1000;
+            
+            console.log(`🔍 Device check: Data is ${secondsAgo.toFixed(1)}s old (max: ${MAX_DATA_AGE_SECONDS}s)`);
+            console.log(`🔍 Device check: Heartbeat = ${data.device_heartbeat}, Age OK = ${secondsAgo <= MAX_DATA_AGE_SECONDS}`);
+            
+            const isOnline = secondsAgo <= MAX_DATA_AGE_SECONDS;
+            console.log(`🔍 Final result: Device ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+            
+            return isOnline;
         };
 
         const updateUI = () => {
@@ -211,6 +259,13 @@
         const updateDeviceStatusIndicator = (isOnline) => {
             ui.valveControllerStatus.textContent = isOnline ? 'Online' : 'Offline';
             ui.valveControllerStatus.className = `device-status-indicator ${isOnline ? 'online' : 'offline'}`;
+            
+            // Update card styling
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.classList.toggle('online-device', isOnline);
+                card.classList.toggle('offline-device', !isOnline);
+            });
         };
 
         let volumeChart = null;
@@ -259,6 +314,15 @@
             const data = systemState.esp_data;
             const isSensorLockout = isOnline && data && data.sensor_lockout === true;
             const isLimitReached = isOnline && data && data.limit_reached === true;
+            const isManualMode = isOnline && data && data.system_mode === 'MANUAL';
+
+            console.log('🔧 Updating valve panel:', {
+                isOnline,
+                isSensorLockout,
+                isLimitReached,
+                isManualMode,
+                data: data ? 'present' : 'missing'
+            });
 
             const buttonsDisabled = !isOnline || isSensorLockout;
             ui.controlButtons.querySelectorAll('button').forEach(btn => btn.disabled = buttonsDisabled);
@@ -268,16 +332,19 @@
             let statusClass = 'system-status normal';
             
             if (!isOnline) {
-                statusMessage = 'Device Offline - No Connection';
+                statusMessage = 'ESP32 Device Offline - Check connection and power';
                 statusClass = 'system-status offline';
             } else if (isSensorLockout) {
-                statusMessage = 'Sensor Lockout - Check Flow Sensor Connection';
+                statusMessage = 'SENSOR LOCKOUT - Flow sensor inactive for 30+ seconds';
                 statusClass = 'system-status limit-reached';
             } else if (isLimitReached) {
                 statusMessage = 'Volume limit reached - valve closed automatically';
                 statusClass = 'system-status limit-reached';
+            } else if (isManualMode) {
+                statusMessage = 'Manual Mode - Automatic features disabled';
+                statusClass = 'system-status normal';
             } else {
-                statusMessage = 'System operating normally';
+                statusMessage = 'System operating normally in AUTO mode';
                 statusClass = 'system-status normal';
             }
             
@@ -352,20 +419,32 @@
 
         const getSystemStatus = async () => {
             try {
+                console.log('📡 Fetching system status from API...');
                 const response = await fetch(MQTT_PROXY_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'get_system_status' })
                 });
+                
                 if (!response.ok) {
                     const err = await response.json().catch(() => ({ details: `Server returned an error: ${response.status}` }));
                     throw new Error(err.details);
                 }
+                
                 const result = await response.json();
+                console.log('📡 API Response:', result);
+                
                 systemState.esp_data = result.data.esp_data;
                 systemState.isCommandPending = false;
+                
+                if (systemState.esp_data) {
+                    console.log('✅ ESP32 data received:', systemState.esp_data);
+                } else {
+                    console.log('⚠️ No ESP32 data in response');
+                }
+                
             } catch (error) {
-                console.error("Failed to get system status:", error.message);
+                console.error("❌ Failed to get system status:", error.message);
                 systemState.esp_data = null;
             }
             updateUI();
