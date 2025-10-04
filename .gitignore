@@ -1,0 +1,24 @@
+# Netlify Functions (auto-generated)
+/.netlify/
+
+# Node modules
+/node_modules/
+
+# Environment variables (if you create local .env files)
+.env
+.env.local
+.env.production
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

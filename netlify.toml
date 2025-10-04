@@ -1,0 +1,3 @@
+[build]
+  # This tells Netlify where to find your serverless functions.
+  functions = "api/"

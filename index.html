@@ -9,210 +9,417 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        body { 
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); 
-            color: #333; 
-            min-height: 100vh; 
-            padding: 20px; 
+        :root {
+            --primary-bg: #0a0e14;
+            --secondary-bg: #161b22;
+            --border-color: #30363d;
+            --primary-text: #c9d1d9;
+            --heading-text: #58a6ff;
+            --success-color: #238636;
+            --success-glow: rgba(35, 134, 54, 0.5);
+            --error-color: #da3633;
+            --error-glow: rgba(218, 54, 51, 0.4);
+            --pending-color: #dbab09;
+            --water-color: #3e92cc;
+            --water-color-light: #6ab1d7;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
-        header { text-align: center; margin-bottom: 30px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        h1 { font-size: 2.5rem; margin-bottom: 10px; }
-        .subtitle { font-size: 1.2rem; opacity: 0.9; }
-        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-        @media (max-width: 768px) { .dashboard { grid-template-columns: 1fr; } }
-        .card { 
-            background: rgba(255,255,255,0.95); 
-            border-radius: 15px; 
-            padding: 20px; 
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--primary-text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            width: 100%; 
+            max-width: 800px; 
+        }
+        
+        .header h1 { 
+            color: var(--heading-text); 
+            font-size: clamp(1.8rem, 5vw, 2.5rem); 
+            margin-bottom: 5px; 
+        }
+        
+        .header p { 
+            color: var(--primary-text); 
+            font-size: 1.1em; 
+            font-style: italic; 
+            opacity: 0.8; 
+        }
+        
+        .dashboard-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); 
+            gap: 25px; 
+            width: 100%; 
+            max-width: 1200px; 
+        }
+        
+        .panel {
+            background: linear-gradient(145deg, #1a2029, #13171f);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
             position: relative;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .card.online-device {
-            border: 2px solid #2ecc71;
-            box-shadow: 0 0 20px rgba(46, 204, 113, 0.3), 0 10px 20px rgba(0,0,0,0.2);
+        
+        .panel.online-device {
+            border-color: var(--success-color);
+            box-shadow: 0 0 20px var(--success-glow);
         }
-        .card.offline-device {
-            border: 2px solid #e74c3c;
-            box-shadow: 0 0 15px rgba(231, 76, 60, 0.3), 0 10px 20px rgba(0,0,0,0.2);
+        
+        .panel.offline-device {
+            border-color: var(--error-color);
+            box-shadow: 0 0 15px var(--error-glow);
         }
-        .card-title { 
-            font-size: 1.5rem; 
-            margin-bottom: 15px; 
-            color: #2c3e50; 
-            text-align: center; 
-            border-bottom: 2px solid #eee; 
-            padding-bottom: 10px; 
+        
+        .panel-header { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 12px; 
+            margin-bottom: 25px; 
         }
-        .gauge-wrapper { position: relative; width: 100%; margin: 0 auto; }
-        .gauge-container { position: relative; width: 100%; height: 200px; margin: 0 auto; }
-        .gauge-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .gauge-text { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+        
+        .panel-header svg { 
+            width: 28px; 
+            height: 28px; 
+            color: var(--heading-text); 
         }
-        .gauge-value { font-size: 2.5rem; font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
-        .gauge-label { font-size: 1.2rem; color: #7f8c8d; }
-        .stats { display: flex; justify-content: space-around; margin-top: 20px; text-align: center; }
-        .stat-item { padding: 10px; }
-        .stat-value { font-size: 1.8rem; font-weight: bold; color: #2c3e50; }
-        .stat-label { font-size: 1rem; color: #7f8c8d; }
-        .controls { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
-        .btn { 
-            padding: 12px 25px; 
-            border: none; 
-            border-radius: 50px; 
-            font-size: 1rem; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: all 0.3s ease; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        
+        .panel-header h2 { 
+            color: var(--heading-text); 
+            font-size: 1.6em; 
+            margin: 0; 
         }
-        .btn-open { background: linear-gradient(to right, #2ecc71, #27ae60); color: white; }
-        .btn-close { background: linear-gradient(to right, #e74c3c, #c0392b); color: white; }
-        .btn-reset { background: linear-gradient(to right, #3498db, #2980b9); color: white; }
-        .btn:disabled { background: #95a5a6; cursor: not-allowed; opacity: 0.7; }
-        .btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 7px 10px rgba(0,0,0,0.2); }
-        .status-indicator { display: inline-block; width: 15px; height: 15px; border-radius: 50%; margin-right: 8px; }
-        .status-open { background-color: #2ecc71; }
-        .status-closed { background-color: #e74c3c; }
-        .system-status { text-align: center; padding: 10px; margin-top: 20px; border-radius: 5px; font-weight: bold; }
-        .system-status.normal { background-color: #d4edda; color: #155724; }
-        .system-status.limit-reached { background-color: #f8d7da; color: #721c24; }
-        .system-status.offline { background-color: #f8d7da; color: #721c24; }
-        .settings-panel { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; }
-        .input-group { margin-bottom: 15px; }
-        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .input-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        .input-group input[type="checkbox"] { 
-            width: auto; 
-            margin-right: 8px; 
-            transform: scale(1.2); 
-            vertical-align: middle; 
-        }
-        .checkbox-label {
-            display: flex !important;
-            align-items: center;
-            margin-bottom: 5px !important;
-            font-weight: bold;
-            cursor: pointer;
-        }
+        
         .device-status-indicator {
-            position: absolute; top: 15px; right: 20px; padding: 5px 12px;
-            border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;
-            background-color: #2ecc71; color: white;
+            position: absolute; 
+            top: 15px; 
+            right: 20px; 
+            padding: 5px 12px;
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: 600; 
+            text-transform: uppercase;
         }
+        
         .device-status-indicator.online { 
-            background-color: #2ecc71; 
+            background-color: var(--success-color); 
+            color: white; 
             animation: pulse 2s infinite; 
         }
+        
         .device-status-indicator.offline { 
-            background-color: #e74c3c; 
-            animation: none;
+            background-color: var(--error-color); 
+            color: white; 
         }
-        @keyframes pulse { 
-            0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); } 
-            70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); } 
-            100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); } 
+        
+        .status-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 14px; 
+            margin-bottom: 12px; 
+            background: var(--primary-bg); 
+            border-left: 5px solid var(--heading-text); 
+            border-radius: 8px; 
+            transition: all 0.2s ease; 
         }
-        .toast-notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 10px; color: white; font-weight: 600; z-index: 1000; transition: all 0.5s ease; }
+        
+        .status-item:hover { 
+            transform: scale(1.02); 
+            background-color: #222831; 
+        }
+        
+        .status-label { 
+            font-weight: 500; 
+            opacity: 0.9; 
+        }
+        
+        .status-value { 
+            font-weight: 700; 
+        }
+        
+        .status-on { color: var(--success-color); }
+        .status-off { color: var(--error-color); }
+        .status-pending { color: var(--pending-color); }
+        
+        .button-group { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+        }
+        
+        .btn {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: all 0.5s;
+        }
+        
+        .btn:hover:not(:disabled):before { left: 100%; }
+        .btn:disabled { cursor: not-allowed; opacity: 0.6; }
+        .btn-on { background: linear-gradient(145deg, #28a745, #218838); }
+        .btn-off { background: linear-gradient(145deg, #dc3545, #c82333); }
+        .btn-reset { background: linear-gradient(145deg, #007bff, #0056b3); }
+        
+        .toast-notification { 
+            position: fixed; 
+            bottom: -100px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            padding: 15px 25px; 
+            border-radius: 10px; 
+            color: white; 
+            font-weight: 600; 
+            z-index: 1000; 
+            transition: all 0.5s ease; 
+        }
+        
         .toast-notification.show { bottom: 20px; }
-        .toast-notification.success { background-color: #2ecc71; }
-        .toast-notification.error { background-color: #e74c3c; }
+        .toast-notification.success { background-color: var(--success-color); }
+        .toast-notification.error { background-color: var(--error-color); }
+        .toast-notification.info { background-color: #007bff; }
+
+        .gauge-container {
+            height: 200px;
+            width: 200px;
+            margin: 20px auto;
+            position: relative;
+        }
+        
+        .gauge-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        
+        .gauge-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--heading-text);
+            margin-bottom: 5px;
+        }
+        
+        .gauge-label {
+            font-size: 1.2rem;
+            color: var(--primary-text);
+        }
+        
+        .thingspeak-section {
+            margin-top: 30px;
+            width: 100%;
+        }
+        
+        .thingspeak-title {
+            text-align: center;
+            color: var(--heading-text);
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        
+        .thingspeak-graphs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .thingspeak-graph {
+            background: var(--secondary-bg);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .thingspeak-graph h3 {
+            color: var(--heading-text);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .thingspeak-graph iframe {
+            width: 100%;
+            height: 260px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
         @media (max-width: 768px) {
-            .gauge-container { height: 180px; }
-            .gauge-value { font-size: 2rem; }
-            .gauge-label { font-size: 1rem; }
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+            .thingspeak-graphs {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>EvaraTap Flow Control System</h1>
-            <p class="subtitle">Advanced Water Management with Volume Control</p>
-        </header>
-        <div class="dashboard">
-            <!-- Volume Gauge Card -->
-            <div class="card">
-                <div id="valveControllerStatus" class="device-status-indicator offline">Offline</div>
-                <h2 class="card-title">Total Volume</h2>
-                <div class="gauge-wrapper">
-                    <div class="gauge-container">
-                        <canvas id="volumeGauge" class="gauge-canvas"></canvas>
-                        <div class="gauge-text">
-                            <div class="gauge-value" id="totalVolumeGauge">0.0</div>
-                            <div class="gauge-label">Liters</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-value" id="flowRate">0.0</div>
-                        <div class="stat-label">Flow Rate (L/min)</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">
-                            <span class="status-indicator" id="valveStatusIndicator"></span>
-                            <span id="valveStatus">UNKNOWN</span>
-                        </div>
-                        <div class="stat-label">Valve Status</div>
-                    </div>
-                </div>
-                <div class="system-status" id="systemStatusMessage">System Status</div>
+    <div class="header">
+        <h1>EvaraTap Flow Control System</h1>
+        <p>Smart Water Flow Management with MQTT Integration</p>
+    </div>
+    
+    <div class="dashboard-container">
+        <!-- Flow Control Panel -->
+        <div id="flowPanel" class="panel">
+            <div id="esp32StatusIndicator" class="device-status-indicator offline">Offline</div>
+            <div class="panel-header">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm0 1.5a8.25 8.25 0 0 1 8.25 8.25c0 1.983-.703 3.82-1.875 5.25a.75.75 0 0 1-1.06-1.06 6.75 6.75 0 0 0-10.632 0 .75.75 0 0 1-1.06 1.06A8.22 8.22 0 0 1 3.75 12 8.25 8.25 0 0 1 12 3.75Z"/>
+                </svg>
+                <h2>Flow Control System</h2>
             </div>
-
-            <!-- Control Card -->
-            <div class="card">
-                <h2 class="card-title">System Controls</h2>
-                <div class="controls" id="controlButtons">
-                    <button class="btn btn-open" data-command="open">Open Valve</button>
-                    <button class="btn btn-close" data-command="close">Close Valve</button>
-                    <button class="btn btn-reset" data-command="reset">Reset System</button>
+            
+            <div class="gauge-container">
+                <canvas id="volumeGauge"></canvas>
+                <div class="gauge-text">
+                    <div class="gauge-value" id="totalVolumeDisplay">--</div>
+                    <div class="gauge-label">Liters</div>
                 </div>
-
-                <div class="settings-panel">
-                    <h3>Volume Limit Settings</h3>
-                    <div class="input-group">
-                        <label for="volumeLimitInput">Volume Limit (Liters)</label>
-                        <input type="number" id="volumeLimitInput" min="1" step="0.5" value="100.0">
-                    </div>
-                    <div class="input-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="autoShutoff" checked>
-                            <span>Enable Auto Shutoff</span>
-                        </label>
-                    </div>
-                    <button class="btn" onclick="saveSettings()" style="background:#3498db;color:white;width:100%;">Save Settings</button>
-                </div>
-
-                <div class="stats" style="margin-top: 20px;">
-                    <div class="stat-item">
-                        <div class="stat-value" id="sessionVolume">0.0 L</div>
-                        <div class="stat-label">Session Volume</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="volumeLimit">100.0 L</div>
-                        <div class="stat-label">Volume Limit</div>
-                    </div>
-                </div>
+            </div>
+            
+            <div class="status-item">
+                <span class="status-label">Flow Rate</span>
+                <span class="status-value" id="flowRate">-- L/min</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Total Volume</span>
+                <span class="status-value" id="totalVolume">-- L</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Valve State</span>
+                <span class="status-value" id="valveStatus">UNKNOWN</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">System Mode</span>
+                <span class="status-value" id="systemMode">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Session Time</span>
+                <span class="status-value" id="sessionTime">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Update</span>
+                <span class="status-value" id="lastUpdate">Never</span>
+            </div>
+        </div>
+        
+        <!-- Control Panel -->
+        <div id="controlPanel" class="panel">
+            <div class="panel-header">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 5.438a.75.75 0 0 0 .634.893l.3.053a.75.75 0 0 1 .634.893l-.173 1.04a.75.75 0 0 0 .33.832l.3.173a.75.75 0 0 1 .33.832l-.173 1.04a.75.75 0 0 0 .33.832l.3.173a.75.75 0 0 1 .33.832l-.173 1.04a.75.75 0 0 0 .634.893l.3.053a.75.75 0 0 1 .634.893l-1.732 1.04a1.875 1.875 0 0 1-1.85 1.567h-1.156a1.875 1.875 0 0 1-1.85-1.567L6.05 16.562a.75.75 0 0 0-.634-.893l-.3-.053a.75.75 0 0 1-.634-.893l.173-1.04a.75.75 0 0 0-.33-.832l-.3-.173a.75.75 0 0 1-.33-.832l.173-1.04a.75.75 0 0 0-.33-.832l-.3-.173a.75.75 0 0 1-.33-.832l.173-1.04a.75.75 0 0 0-.33-.832l-.3-.173a.75.75 0 0 1-.33-.832l.173-1.04a.75.75 0 0 0-.634-.893l-.3-.053a.75.75 0 0 1-.634-.893L5.95 3.817a1.875 1.875 0 0 1 1.85-1.567h1.156Z" clip-rule="evenodd" />
+                </svg>
+                <h2>Valve Control</h2>
+            </div>
+            
+            <div class="status-item">
+                <span class="status-label">Volume Since Open</span>
+                <span class="status-value" id="volumeSinceOpen">-- L</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Volume Limit</span>
+                <span class="status-value" id="volumeLimit">-- L</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Auto Shutoff</span>
+                <span class="status-value" id="autoShutoff">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Limit Status</span>
+                <span class="status-value" id="limitStatus">--</span>
+            </div>
+            
+            <div class="button-group" style="margin-top: 30px;" id="controlButtons">
+                <button class="btn btn-on" data-command="on">Open Valve</button>
+                <button class="btn btn-off" data-command="off">Close Valve</button>
+                <button class="btn btn-reset" data-command="reset">Reset System</button>
+                <button class="btn" style="background: linear-gradient(145deg, #6c757d, #5a6268);" data-command="auto">Auto Mode</button>
             </div>
         </div>
     </div>
-    <div id="toast" class="toast-notification"></div>
     
+    <!-- ThingSpeak Graphs Section -->
+    <div class="thingspeak-section">
+        <h2 class="thingspeak-title">Real-Time Data Visualization</h2>
+        <div class="thingspeak-graphs">
+            <div class="thingspeak-graph">
+                <h3>Flow Rate (L/min)</h3>
+                <iframe src="https://thingspeak.com/channels/2715858/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&title=Flow+Rate"></iframe>
+            </div>
+            <div class="thingspeak-graph">
+                <h3>Total Volume (Liters)</h3>
+                <iframe src="https://thingspeak.com/channels/2715858/charts/2?bgcolor=%23ffffff&color=%23009020&dynamic=true&results=60&type=line&title=Total+Volume"></iframe>
+            </div>
+            <div class="thingspeak-graph">
+                <h3>Valve Status</h3>
+                <iframe src="https://thingspeak.com/channels/2715858/charts/3?bgcolor=%23ffffff&color=%230000ff&dynamic=true&results=60&type=line&title=Valve+Status"></iframe>
+            </div>
+            <div class="thingspeak-graph">
+                <h3>Volume Limit</h3>
+                <iframe src="https://thingspeak.com/channels/2715858/charts/4?bgcolor=%23ffffff&color=%23ff9900&dynamic=true&results=60&type=line&title=Volume+Limit"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast-notification"></div>
+
     <script>
+        // --- EXACTLY MATCHING REFERENCE SYSTEM CONFIGURATION ---
         const MQTT_PROXY_ENDPOINT = "/api/mqtt-proxy";
-        const STATUS_REFRESH_INTERVAL = 3000;
-        const MAX_DATA_AGE_SECONDS = 15;
+        const STATUS_REFRESH_INTERVAL = 3000;  // Poll every 3 seconds like reference
+        const MAX_DATA_AGE_SECONDS = 15;       // 15 second freshness threshold like reference
 
-        let systemState = { esp_data: null, isCommandPending: false };
-        let statusIntervalId = null; 
+        // --- SYSTEM STATE MATCHING REFERENCE ---
+        let systemState = { esp32: null, isCommandPending: false };
+        let statusIntervalId = null;
+        let volumeChart = null;
 
+        // --- UI ELEMENTS CACHE ---
         const ui = {};
 
+        // --- UTILITY FUNCTIONS - EXACTLY MATCHING REFERENCE ---
         const showToast = (message, type = 'error') => {
             ui.toast.textContent = message;
             ui.toast.className = `toast-notification ${type} show`;
@@ -232,195 +439,166 @@
             return `${hours}h ago`;
         };
 
+        const formatSecondsToHMS = (seconds) => {
+            if (isNaN(seconds) || seconds < 0) return '--';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h}h ${m}m ${s}s`;
+        };
+
+        // --- ONLINE/OFFLINE DETECTION - EXACTLY MATCHING REFERENCE ---
         const isDeviceOnline = (data) => {
-            // Enhanced online detection with debugging
-            console.log('🔍 Checking device online status...');
+            console.log('🔍 Checking device online status:', {
+                hasData: !!data,
+                last_updated: data?.last_updated,
+                device_heartbeat: data?.device_heartbeat
+            });
             
-            if (!data) {
-                console.log('🔍 Device check: No data received');
+            const isStale = !data || !data.last_updated || 
+                (new Date() - new Date(data.last_updated)) / 1000 > MAX_DATA_AGE_SECONDS;
+            
+            console.log('⏰ Staleness check:', {
+                isStale: isStale,
+                ageSeconds: data?.last_updated ? (new Date() - new Date(data.last_updated)) / 1000 : 'N/A',
+                maxAgeSeconds: MAX_DATA_AGE_SECONDS
+            });
+            
+            if (isStale) {
+                console.log('❌ Device OFFLINE: Data is stale');
                 return false;
             }
             
-            if (!data.last_updated) {
-                console.log('🔍 Device check: No last_updated timestamp');
-                return false;
-            }
-            
-            if (data.device_heartbeat !== true) {
-                console.log('🔍 Device check: Heartbeat not true:', data.device_heartbeat);
-                return false;
-            }
-            
-            const now = new Date();
-            const dataTime = new Date(data.last_updated);
-            const secondsAgo = (now - dataTime) / 1000;
-            
-            console.log(`🔍 Device check: Data is ${secondsAgo.toFixed(1)}s old (max: ${MAX_DATA_AGE_SECONDS}s)`);
-            console.log(`🔍 Device check: Heartbeat = ${data.device_heartbeat}, Age OK = ${secondsAgo <= MAX_DATA_AGE_SECONDS}`);
-            
-            const isOnline = secondsAgo <= MAX_DATA_AGE_SECONDS;
-            console.log(`🔍 Final result: Device ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
-            
+            const isOnline = data.device_heartbeat === true;
+            console.log(isOnline ? '✅ Device ONLINE' : '❌ Device OFFLINE: No heartbeat');
             return isOnline;
         };
 
+        // --- UI UPDATE FUNCTIONS - MATCHING REFERENCE PATTERN ---
         const updateUI = () => {
-            const deviceOnline = isDeviceOnline(systemState.esp_data);
-            updateDeviceStatusIndicator(deviceOnline);
-            updateValvePanel(deviceOnline);
+            const esp32Online = isDeviceOnline(systemState.esp32);
+            
+            updateDeviceStatusIndicator(ui.esp32StatusIndicator, ui.flowPanel, esp32Online);
+            updateFlowPanel(esp32Online);
+            updateControlPanel(esp32Online);
         };
 
-        const updateDeviceStatusIndicator = (isOnline) => {
-            ui.valveControllerStatus.textContent = isOnline ? 'Online' : 'Offline';
-            ui.valveControllerStatus.className = `device-status-indicator ${isOnline ? 'online' : 'offline'}`;
-            
-            // Update card styling
-            const cards = document.querySelectorAll('.card');
-            cards.forEach(card => {
-                card.classList.toggle('online-device', isOnline);
-                card.classList.toggle('offline-device', !isOnline);
-            });
+        const updateDeviceStatusIndicator = (indicatorEl, panelEl, isOnline) => {
+            indicatorEl.textContent = isOnline ? 'Online' : 'Offline';
+            indicatorEl.className = `device-status-indicator ${isOnline ? 'online' : 'offline'}`;
+            panelEl.classList.toggle('online-device', isOnline);
+            panelEl.classList.toggle('offline-device', !isOnline);
         };
 
-        let volumeChart = null;
-
-        const createVolumeGauge = () => {
-            const canvas = document.getElementById('volumeGauge');
-            const container = canvas.parentElement;
-            canvas.width = container.offsetWidth;
-            canvas.height = container.offsetHeight;
-
-            const ctx = canvas.getContext('2d');
+        const updateFlowPanel = (isOnline) => {
+            const data = systemState.esp32;
             
-            if (volumeChart) {
-                volumeChart.destroy();
-            }
-
-            const data = systemState.esp_data;
-            const currentVolume = data ? (data.total_volume_liters || 0) : 0;
-            const volumeLimit = data ? (data.volume_limit_liters || 100) : 100;
-            const remainingVolume = Math.max(0, volumeLimit - currentVolume);
-
-            volumeChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    datasets: [{
-                        data: [currentVolume, remainingVolume],
-                        backgroundColor: [
-                            currentVolume > volumeLimit * 0.8 ? '#e74c3c' : '#3498db',
-                            '#ecf0f1'
-                        ],
-                        borderWidth: 0,
-                        borderRadius: 5,
-                        circumference: 180,
-                        rotation: -90
-                    }]
-                },
-                options: {
-                    cutout: '70%',
-                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                    maintainAspectRatio: false
-                }
-            });
-        };
-
-        const updateValvePanel = (isOnline) => {
-            const data = systemState.esp_data;
-            const isSensorLockout = isOnline && data && data.sensor_lockout === true;
-            const isLimitReached = isOnline && data && data.limit_reached === true;
-            const isManualMode = isOnline && data && data.system_mode === 'MANUAL';
-
-            console.log('🔧 Updating valve panel:', {
-                isOnline,
-                isSensorLockout,
-                isLimitReached,
-                isManualMode,
-                data: data ? 'present' : 'missing'
-            });
-
-            const buttonsDisabled = !isOnline || isSensorLockout;
-            ui.controlButtons.querySelectorAll('button').forEach(btn => btn.disabled = buttonsDisabled);
-
-            // Update system status message
-            let statusMessage = 'System Status';
-            let statusClass = 'system-status normal';
+            ui.flowRate.textContent = isOnline && data && data.flow_rate_lpm !== null ? 
+                `${data.flow_rate_lpm.toFixed(1)} L/min` : '-- L/min';
             
-            if (!isOnline) {
-                statusMessage = 'ESP32 Device Offline - Check connection and power';
-                statusClass = 'system-status offline';
-            } else if (isSensorLockout) {
-                statusMessage = 'SENSOR LOCKOUT - Flow sensor inactive for 30+ seconds';
-                statusClass = 'system-status limit-reached';
-            } else if (isLimitReached) {
-                statusMessage = 'Volume limit reached - valve closed automatically';
-                statusClass = 'system-status limit-reached';
-            } else if (isManualMode) {
-                statusMessage = 'Manual Mode - Automatic features disabled';
-                statusClass = 'system-status normal';
-            } else {
-                statusMessage = 'System operating normally in AUTO mode';
-                statusClass = 'system-status normal';
-            }
+            ui.totalVolume.textContent = isOnline && data && data.total_volume_liters !== null ? 
+                `${data.total_volume_liters.toFixed(1)} L` : '-- L';
             
-            ui.systemStatusMessage.textContent = statusMessage;
-            ui.systemStatusMessage.className = statusClass;
-
-            // Update valve status with indicator
+            ui.totalVolumeDisplay.textContent = isOnline && data && data.total_volume_liters !== null ? 
+                data.total_volume_liters.toFixed(1) : '--';
+                
             if (systemState.isCommandPending) {
                 ui.valveStatus.textContent = 'Pending...';
-                ui.valveStatusIndicator.className = 'status-indicator';
+                ui.valveStatus.className = 'status-value status-pending';
             } else {
-                const valveOpen = isOnline && data && data.valve_state === 'ON';
-                ui.valveStatus.textContent = isOnline && data ? data.valve_state || 'UNKNOWN' : 'UNKNOWN';
-                ui.valveStatusIndicator.className = `status-indicator ${valveOpen ? 'status-open' : 'status-closed'}`;
+                const state = isOnline && data && data.motor_state ? data.motor_state : 'UNKNOWN';
+                ui.valveStatus.textContent = state;
+                ui.valveStatus.className = `status-value status-${state.toLowerCase()}`;
             }
-
-            // Update flow rate
-            ui.flowRate.textContent = isOnline && data && data.flow_rate_lpm !== undefined ? 
-                data.flow_rate_lpm.toFixed(1) : '0.0';
-
-            // Update volumes
-            const totalVol = isOnline && data && data.total_volume_liters !== undefined ? 
-                data.total_volume_liters.toFixed(1) : '0.0';
-            const sessionVol = isOnline && data && data.volume_since_open !== undefined ? 
-                data.volume_since_open.toFixed(1) : '0.0';
-            const volLimit = isOnline && data && data.volume_limit_liters !== undefined ? 
-                data.volume_limit_liters.toFixed(1) : '100.0';
-
-            ui.totalVolumeGauge.textContent = totalVol;
-            ui.sessionVolume.textContent = sessionVol + ' L';
-            ui.volumeLimit.textContent = volLimit + ' L';
-
-            // Update volume limit input
-            if (isOnline && data && data.volume_limit_liters !== undefined) {
-                ui.volumeLimitInput.value = data.volume_limit_liters.toFixed(1);
-            }
-
-            // Update auto shutoff checkbox
-            if (isOnline && data && data.auto_shutoff_enabled !== undefined) {
-                ui.autoShutoff.checked = data.auto_shutoff_enabled;
-            }
-
-            createVolumeGauge();
+            
+            ui.systemMode.textContent = isOnline && data && data.system_mode ? data.system_mode : '--';
+            ui.sessionTime.textContent = isOnline && data ? formatSecondsToHMS(data.current_on_time_s) : '--';
+            ui.lastUpdate.textContent = isOnline && data ? formatTimeAgo(data.last_updated) : 'Never';
+            
+            // Update gauge
+            updateGauge(isOnline, data);
         };
 
+        const updateControlPanel = (isOnline) => {
+            const data = systemState.esp32;
+            
+            ui.volumeSinceOpen.textContent = isOnline && data && data.volume_since_open !== null ? 
+                `${data.volume_since_open.toFixed(1)} L` : '-- L';
+            
+            ui.volumeLimit.textContent = isOnline && data && data.volume_limit_liters !== null ? 
+                `${data.volume_limit_liters.toFixed(1)} L` : '-- L';
+                
+            ui.autoShutoff.textContent = isOnline && data ? 
+                (data.auto_shutoff_enabled ? 'ENABLED' : 'DISABLED') : '--';
+            
+            ui.limitStatus.textContent = isOnline && data ? 
+                (data.limit_reached ? 'REACHED' : 'OK') : '--';
+            
+            // Update button states
+            const buttonsDisabled = !isOnline || systemState.isCommandPending || 
+                (data && data.sensor_lockout);
+            
+            ui.controlButtons.querySelectorAll('button').forEach(btn => {
+                btn.disabled = buttonsDisabled;
+            });
+        };
+
+        const updateGauge = (isOnline, data) => {
+            const currentVolume = (isOnline && data) ? data.total_volume_liters : 0;
+            const volumeLimit = (isOnline && data) ? data.volume_limit_liters : 100;
+            
+            if (!volumeChart) {
+                const ctx = ui.volumeGauge.getContext('2d');
+                volumeChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { 
+                        datasets: [{ 
+                            borderWidth: 0, 
+                            borderRadius: 5, 
+                            circumference: 180, 
+                            rotation: -90 
+                        }] 
+                    },
+                    options: { 
+                        cutout: '70%', 
+                        plugins: { 
+                            legend: { display: false }, 
+                            tooltip: { enabled: false } 
+                        }, 
+                        maintainAspectRatio: false 
+                    }
+                });
+            }
+            
+            const remainingVolume = Math.max(0, volumeLimit - currentVolume);
+            volumeChart.data.datasets[0].data = [currentVolume, remainingVolume];
+            volumeChart.data.datasets[0].backgroundColor = [
+                currentVolume > volumeLimit * 0.8 ? '#da3633' : '#3e92cc',
+                '#374151'
+            ];
+            volumeChart.update('none');
+        };
+
+        // --- COMMAND HANDLING - EXACTLY MATCHING REFERENCE ---
         const handleCommand = async (command) => {
             clearInterval(statusIntervalId);
             systemState.isCommandPending = true;
             ui.controlButtons.querySelectorAll('button').forEach(btn => btn.disabled = true);
-            updateUI(); 
+            updateUI();
 
             try {
                 const response = await fetch(MQTT_PROXY_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'send_valve_command', payload: command })
+                    body: JSON.stringify({ action: 'send_esp32_command', payload: command })
                 });
+                
                 if (!response.ok) {
                     const errorDetails = (await response.json()).details || `HTTP ${response.status}`;
                     throw new Error(errorDetails);
                 }
-                showToast(`${command.toUpperCase()} command sent successfully.`, 'success');
+                
+                showToast(`Command "${command.toUpperCase()}" sent successfully.`, 'success');
                 setTimeout(getSystemStatus, 500);
             } catch (error) {
                 showToast(`Command failed: ${error.message}`, 'error');
@@ -431,76 +609,84 @@
             }
         };
 
+        // --- SYSTEM STATUS FETCHING - EXACTLY MATCHING REFERENCE ---
         const getSystemStatus = async () => {
             try {
-                console.log('📡 Fetching system status from API...');
+                console.log('🔄 Fetching system status...');
                 const response = await fetch(MQTT_PROXY_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'get_system_status' })
                 });
                 
+                console.log('📡 Response status:', response.status);
+                
                 if (!response.ok) {
-                    const err = await response.json().catch(() => ({ details: `Server returned an error: ${response.status}` }));
+                    const err = await response.json().catch(() => ({ 
+                        details: `Server returned an error: ${response.status}` 
+                    }));
                     throw new Error(err.details);
                 }
                 
                 const result = await response.json();
-                console.log('📡 API Response:', result);
+                console.log('📦 Full response:', result);
+                console.log('🎯 ESP32 data:', result.data?.esp32);
                 
-                systemState.esp_data = result.data.esp_data;
+                systemState.esp32 = result.data.esp32;
                 systemState.isCommandPending = false;
                 
-                if (systemState.esp_data) {
-                    console.log('✅ ESP32 data received:', systemState.esp_data);
+                if (systemState.esp32) {
+                    console.log('✅ ESP32 data received:', {
+                        device_heartbeat: systemState.esp32.device_heartbeat,
+                        motor_state: systemState.esp32.motor_state,
+                        last_updated: systemState.esp32.last_updated
+                    });
                 } else {
-                    console.log('⚠️ No ESP32 data in response');
+                    console.log('❌ No ESP32 data received');
                 }
-                
             } catch (error) {
                 console.error("❌ Failed to get system status:", error.message);
-                systemState.esp_data = null;
+                systemState.esp32 = null;
             }
             updateUI();
         };
 
-        const saveSettings = () => {
-            const volumeLimit = parseFloat(ui.volumeLimitInput.value);
-            const autoShutoff = ui.autoShutoff.checked;
-            
-            const settingsCommand = {
-                volume_limit: volumeLimit,
-                auto_shutoff: autoShutoff
-            };
-            
-            handleCommand(settingsCommand);
-        };
-
+        // --- INITIALIZATION - EXACTLY MATCHING REFERENCE PATTERN ---
         document.addEventListener('DOMContentLoaded', () => {
+            // Cache UI elements
             ui.toast = document.getElementById('toast');
-            ui.valveControllerStatus = document.getElementById('valveControllerStatus');
-            ui.systemStatusMessage = document.getElementById('systemStatusMessage');
-            ui.valveStatus = document.getElementById('valveStatus');
-            ui.valveStatusIndicator = document.getElementById('valveStatusIndicator');
+            ui.flowPanel = document.getElementById('flowPanel');
+            ui.esp32StatusIndicator = document.getElementById('esp32StatusIndicator');
+            ui.volumeGauge = document.getElementById('volumeGauge');
+            ui.totalVolumeDisplay = document.getElementById('totalVolumeDisplay');
             ui.flowRate = document.getElementById('flowRate');
-            ui.totalVolumeGauge = document.getElementById('totalVolumeGauge');
-            ui.sessionVolume = document.getElementById('sessionVolume');
+            ui.totalVolume = document.getElementById('totalVolume');
+            ui.valveStatus = document.getElementById('valveStatus');
+            ui.systemMode = document.getElementById('systemMode');
+            ui.sessionTime = document.getElementById('sessionTime');
+            ui.lastUpdate = document.getElementById('lastUpdate');
+            ui.volumeSinceOpen = document.getElementById('volumeSinceOpen');
             ui.volumeLimit = document.getElementById('volumeLimit');
-            ui.volumeLimitInput = document.getElementById('volumeLimitInput');
             ui.autoShutoff = document.getElementById('autoShutoff');
+            ui.limitStatus = document.getElementById('limitStatus');
             ui.controlButtons = document.getElementById('controlButtons');
 
+            console.log('🚀 EvaraTap Dashboard Starting...');
+            showToast('System initializing...', 'info');
+
+            // Set up event listeners
             ui.controlButtons.addEventListener('click', (e) => {
-                if (e.target.tagName === 'BUTTON' && !e.target.disabled) {
+                if (e.target.tagName === 'BUTTON' && e.target.dataset.command) {
                     handleCommand(e.target.dataset.command);
                 }
             });
 
-            // Make saveSettings globally available
-            window.saveSettings = saveSettings;
-
+            // Start polling for system status
             getSystemStatus();
             statusIntervalId = setInterval(getSystemStatus, STATUS_REFRESH_INTERVAL);
+            
+            console.log('✅ Dashboard initialized successfully');
+            showToast('Dashboard ready', 'success');
         });
     </script>
 </body>
