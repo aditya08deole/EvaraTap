@@ -86,6 +86,19 @@
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .input-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .input-group input[type="checkbox"] { 
+            width: auto; 
+            margin-right: 8px; 
+            transform: scale(1.2); 
+            vertical-align: middle; 
+        }
+        .checkbox-label {
+            display: flex !important;
+            align-items: center;
+            margin-bottom: 5px !important;
+            font-weight: bold;
+            cursor: pointer;
+        }
         .device-status-indicator {
             position: absolute; top: 15px; right: 20px; padding: 5px 12px;
             border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;
@@ -167,8 +180,9 @@
                         <input type="number" id="volumeLimitInput" min="1" step="0.5" value="100.0">
                     </div>
                     <div class="input-group">
-                        <label>
-                            <input type="checkbox" id="autoShutoff" checked> Enable Auto Shutoff
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="autoShutoff" checked>
+                            <span>Enable Auto Shutoff</span>
                         </label>
                     </div>
                     <button class="btn" onclick="saveSettings()" style="background:#3498db;color:white;width:100%;">Save Settings</button>
