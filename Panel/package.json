@@ -1,0 +1,8 @@
+{
+  "name": "iot-valve-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "mqtt": "5.3.5"
+  }
+}
