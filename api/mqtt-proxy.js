@@ -14,118 +14,56 @@ const TOPIC_ESP_DATA = `${ADAFRUIT_IO_USERNAME}/feeds/esp-data`;
  * Main handler for all incoming requests
  */
 export default async function handler(request, response) {
-    // Set CORS headers
-    response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (request.method === 'OPTIONS') {
-        return response.status(200).end();
-    }
-
     if (request.method !== 'POST') {
-        return response.status(405).json({ 
-            status: 'error', 
-            details: 'Method Not Allowed. Use POST.' 
-        });
+        return response.status(405).json({ status: 'error', details: 'Method Not Allowed' });
     }
-
-    // Verify MQTT credentials
     if (!ADAFRUIT_IO_USERNAME || !ADAFRUIT_IO_KEY) {
-        return response.status(500).json({ 
-            status: 'error', 
-            details: 'MQTT credentials not configured on server.' 
-        });
+        return response.status(500).json({ status: 'error', details: 'CRITICAL: MQTT credentials are not configured on the server.' });
     }
 
     const { action, payload } = request.body;
 
     try {
-        switch (action) {
-            case 'send_valve_command':
-                await handlePublishCommand(TOPIC_VALVE_CONTROL, payload);
-                return response.status(200).json({ 
-                    status: 'success', 
-                    details: 'Valve command sent successfully.' 
-                });
+        if (action === 'send_valve_command') {
+            await handlePublish(TOPIC_VALVE_CONTROL, payload);
+            return response.status(200).json({ status: 'success', details: 'Command published.' });
 
-            case 'get_system_status':
-                // Get system status
-                const statusData = await getSystemStatus();
-                return response.status(200).json({ 
-                    status: 'success', 
-                    data: statusData 
-                });
+        } else if (action === 'get_system_status') {
+            const data = await handleGetSystemStatus();
+            return response.status(200).json({ status: 'success', data });
 
-            default:
-                return response.status(400).json({ 
-                    status: 'error', 
-                    details: 'Invalid action specified.' 
-                });
+        } else {
+            return response.status(400).json({ status: 'error', details: 'Invalid action specified.' });
         }
     } catch (error) {
-        console.error('[MQTT_PROXY_ERROR]', error.message);
-        return response.status(500).json({ 
-            status: 'error', 
-            details: error.message 
-        });
+        console.error('[PROXY_ERROR]', error.message);
+        return response.status(500).json({ status: 'error', details: error.message });
     }
 }
 
 /**
- * Publishes a valve control command to MQTT
+ * Publishes a command message to the specified MQTT topic.
  */
-function handlePublishCommand(topic, command) {
+function handlePublish(topic, command) {
     return new Promise((resolve, reject) => {
         const client = mqtt.connect(`mqtt://${MQTT_BROKER_HOST}:${MQTT_BROKER_PORT}`, {
             username: ADAFRUIT_IO_USERNAME,
             password: ADAFRUIT_IO_KEY,
-            clientId: `evaratap_proxy_${Date.now()}`,
+            clientId: `vercel_proxy_pub_${Date.now()}`,
             reconnectPeriod: 0,
-            connectTimeout: 10000,
         });
 
-        const timeout = setTimeout(() => {
-            client.end(true);
-            reject(new Error('MQTT connection timeout'));
-        }, 15000);
-
         client.on('connect', () => {
-            clearTimeout(timeout);
-            console.log(`✓ MQTT connected for command: ${typeof command === 'object' ? JSON.stringify(command) : command}`);
-            
-            let messagePayload;
-            if (typeof command === 'object') {
-                // Handle settings commands
-                messagePayload = JSON.stringify({
-                    command: 'set_settings',
-                    ...command,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                // Handle simple string commands
-                messagePayload = JSON.stringify({ 
-                    command: command,
-                    timestamp: new Date().toISOString()
-                });
-            }
-            
+            const messagePayload = JSON.stringify({ command: command });
             client.publish(topic, messagePayload, { retain: false }, (err) => {
                 client.end();
-                if (err) {
-                    console.error('❌ Publish error:', err);
-                    reject(new Error('Failed to publish valve command.'));
-                } else {
-                    console.log(`📡 Command published: ${command}`);
-                    resolve();
-                }
+                if (err) return reject(new Error('Failed to publish message.'));
+                resolve();
             });
         });
 
         client.on('error', (err) => {
-            clearTimeout(timeout);
             client.end();
-            console.error('❌ MQTT connection error:', err);
             reject(new Error(`MQTT connection failed: ${err.message}`));
         });
     });
@@ -134,11 +72,10 @@ function handlePublishCommand(topic, command) {
 
 
 /**
- * Fetches the latest ESP32 data from Adafruit IO
+ * Fetches the last status message from a given Adafruit IO feed.
  */
 async function getFeedData(feedKey) {
     const apiUrl = `https://io.adafruit.com/api/v2/${ADAFRUIT_IO_USERNAME}/feeds/${feedKey}/data/last`;
-    
     try {
         const apiResponse = await fetch(apiUrl, {
             headers: { 'X-AIO-Key': ADAFRUIT_IO_KEY },
@@ -146,60 +83,40 @@ async function getFeedData(feedKey) {
 
         if (!apiResponse.ok) {
             if (apiResponse.status === 404) {
-                console.warn(`⚠️ Feed not found: ${feedKey}`);
                 return null;
             }
-            throw new Error(`Adafruit API error for '${feedKey}': ${apiResponse.status}`);
+            throw new Error(`Adafruit API request for '${feedKey}' failed with status ${apiResponse.status}`);
         }
 
         const data = await apiResponse.json();
-        if (!data || !data.value) {
-            console.warn(`⚠️ No data in feed: ${feedKey}`);
-            return null;
-        }
+        if (!data || !data.value) return null;
 
-        // Parse JSON data
-        let parsedValue;
-        try {
-            parsedValue = JSON.parse(data.value);
-        } catch (e) {
-            console.error(`❌ Invalid JSON in feed ${feedKey}:`, data.value);
-            throw new Error(`Malformed JSON from feed ${feedKey}`);
-        }
-
+        const parsedValue = JSON.parse(data.value);
         return {
             ...parsedValue,
             last_updated: data.created_at
         };
-
-    } catch (error) {
-        console.error(`❌ Error fetching feed ${feedKey}:`, error.message);
-        throw error;
+    } catch (e) {
+        if (e instanceof SyntaxError) {
+            throw new Error(`Malformed JSON from feed ${feedKey}.`);
+        }
+        throw e;
     }
 }
 
 /**
- * Gets the current system status from ESP32
+ * Fetches the status from the ESP32 data feed.
  */
-async function getSystemStatus() {
+async function handleGetSystemStatus() {
     const espDataFeedKey = TOPIC_ESP_DATA.split('/').pop();
 
-    try {
-        const espData = await getFeedData(espDataFeedKey);
-        
-        return {
-            esp_data: espData,
-            server_timestamp: new Date().toISOString()
-        };
+    const espDataResult = await Promise.allSettled([
+        getFeedData(espDataFeedKey)
+    ]);
 
-    } catch (error) {
-        console.error('❌ Error getting system status:', error.message);
-        
-        // Return partial data on error
-        return {
-            esp_data: null,
-            server_timestamp: new Date().toISOString(),
-            error: error.message
-        };
-    }
+    const espData = espDataResult[0].status === 'fulfilled' ? espDataResult[0].value : null;
+    
+    return {
+        esp_data: espData,
+    };
 }
